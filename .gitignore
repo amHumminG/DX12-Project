@@ -1,0 +1,38 @@
+# Build Outputs
+[Bb]uild/
+bin/
+obj/
+out/
+[Dd]ebug/
+[Rr]elease/
+Generated\ Files/
+
+# Compiled Binaries & Libraries
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.so
+*.a
+*.dylib
+
+# C++ Cache & Temp Files
+*.obj
+*.tlog
+*.log
+*.cache
+*.db
+*.opendb
+*.VC.db
+ipch/
+
+# --- System Garbage ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# CLion
+.idea/
+cmake-build-*/
