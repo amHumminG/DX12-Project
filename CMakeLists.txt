@@ -10,6 +10,7 @@ set(DX12_LIBS d3d12.lib dxgi.lib dxguid.lib d3dcompiler.lib)
 set(SOURCE_FILES
     src/main.cpp
     src/DX12.h
+    src/Helpers.h
 )
 add_executable(${PROJECT_NAME} WIN32 ${SOURCE_FILES})
 
