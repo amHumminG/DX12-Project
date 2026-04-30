@@ -4,15 +4,13 @@ project(DX12Sandbox)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-
 set(DX12_LIBS d3d12.lib dxgi.lib dxguid.lib d3dcompiler.lib)
 
-set(SOURCE_FILES
-    src/main.cpp
-    src/DX12.h
-    src/Helpers.h
+file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS
+    "src/*.cpp"
+    "src/*.h"
 )
-add_executable(${PROJECT_NAME} WIN32 ${SOURCE_FILES})
+add_executable(${PROJECT_NAME} WIN32 ${SOURCE_FILES} "src/test.h")
 
 target_include_directories(${PROJECT_NAME}
     PRIVATE src

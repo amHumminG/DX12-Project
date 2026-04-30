@@ -36,3 +36,14 @@ desktop.ini
 # CLion
 .idea/
 cmake-build-*/
+
+# Visual Studio specific files
+.vs/
+out/
+*.sln
+*.vcxproj
+*.vcxproj.user
+*.vcxproj.filters
+
+# DirectX12 dll's
+!D3D12/x64/*
