@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Window.h"
+#include "Renderer.h"
 
 #include <memory>
 #include <string>
@@ -25,4 +26,5 @@ private:
 	bool m_isRunning = false;
 
 	std::unique_ptr<Window> m_window;
+	std::unique_ptr<Renderer> m_renderer;
 };

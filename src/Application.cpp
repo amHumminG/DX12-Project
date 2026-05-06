@@ -30,6 +30,7 @@ LRESULT CALLBACK GlobalWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
 Application::Application(const wchar_t* title, uint32_t width, uint32_t height) {
 	g_appInstance = this;
 	m_window = std::make_unique<Window>(title, width, height, GlobalWndProc);
+	m_renderer = std::make_unique<Renderer>(&m_window);
 }
 
 Application::~Application() {
@@ -42,6 +43,7 @@ bool Application::Initialize() {
 	if (!m_window->Initialize()) return false;
 
 	// Initialize renderer here
+	if (!m_renderer->Initialize()) return false;
 
 	return true;
 }
@@ -97,6 +99,7 @@ void Application::Update(double deltaTime) {
 
 void Application::Render() {
 	// Rendering logic
+	m_renderer->Render();
 }
 
 
