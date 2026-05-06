@@ -11,8 +11,8 @@
 #include <algorithm>
 
 Window::Window(const wchar_t* title, uint32_t width, uint32_t height, WNDPROC wndProc)
-	: m_isInitialized(false), m_hWnd(nullptr), m_windowRect{}, m_wndProc(wndProc),
-	m_title(title), m_width(width), m_height(height), m_fullscreen(false) {
+	: m_hWnd(nullptr), m_windowRect{}, m_wndProc(wndProc),
+	m_title(title), m_width(width), m_height(height) {
 }
 
 Window::~Window() {

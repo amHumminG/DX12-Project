@@ -35,5 +35,5 @@ private:
 	const wchar_t* m_title;
 	uint32_t m_width = 0;
 	uint32_t m_height = 0;
-	bool m_fullscreen = true;
+	bool m_fullscreen = false;
 };
