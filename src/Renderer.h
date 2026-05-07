@@ -18,6 +18,8 @@ public:
 	void Render();
 
 private:
+	bool m_isInitialized = false;
+
 	std::unique_ptr<Window>* m_windowPtr;
 
 	static const uint8_t	m_NumFrames = 3; // The number of swap chain buffers

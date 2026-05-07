@@ -11,6 +11,8 @@ Renderer::Renderer(std::unique_ptr<Window>* window)
 
 bool Renderer::Initialize()
 {
+	if (m_isInitialized) return true;
+
 	SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
 	EnableDebugLayer();
@@ -26,11 +28,15 @@ bool Renderer::Initialize()
 
 	UpdateRenderTargetViews(m_Device, m_SwapChain, m_RTVDescriptorHeap);
 
+	m_isInitialized = true;
+
 	return true;
 }
 
 void Renderer::Render()
 {
+	if (!m_isInitialized) return;
+
 	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer = m_BackBuffers[m_CurrentBackBufferIndex];
 
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_CommandQueue->GetCommandList();
