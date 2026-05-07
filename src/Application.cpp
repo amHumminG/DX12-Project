@@ -45,11 +45,13 @@ bool Application::Initialize() {
 	// Initialize renderer here
 	if (!m_renderer->Initialize()) return false;
 
+	m_isInitialized = true;
+
 	return true;
 }
 
 void Application::Run() {
-	if (m_isInitialized) return;
+	if (!m_isInitialized) return;
 
 	m_isRunning = true;
 	m_window->Show();
