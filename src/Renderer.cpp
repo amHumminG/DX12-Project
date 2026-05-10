@@ -67,8 +67,6 @@ void Renderer::Render()
 
 		commandList->ResourceBarrier(1, &barrier);
 
-		ThrowIfFailed(commandList->Close());
-
 		ID3D12CommandList *const commandLists[] = { commandList.Get() };
 		m_CommandQueue->ExecuteCommandList(commandList);
 
