@@ -43,22 +43,22 @@ foreach(SHADER ${SHADER_FILES})
 
     # Determine shader profile from filename
     if(SHADER_FILE MATCHES "\\.vs\\.hlsl$")
-        set(SHADER_PROFILE vs_5_0)
+        set(SHADER_PROFILE vs_5_1)
 
     elseif(SHADER_FILE MATCHES "\\.ps\\.hlsl$")
-        set(SHADER_PROFILE ps_5_0)
+        set(SHADER_PROFILE ps_5_1)
 
     elseif(SHADER_FILE MATCHES "\\.cs\\.hlsl$")
-        set(SHADER_PROFILE cs_5_0)
+        set(SHADER_PROFILE cs_5_1)
 
     elseif(SHADER_FILE MATCHES "\\.gs\\.hlsl$")
-        set(SHADER_PROFILE gs_5_0)
+        set(SHADER_PROFILE gs_5_1)
 
     elseif(SHADER_FILE MATCHES "\\.hs\\.hlsl$")
-        set(SHADER_PROFILE hs_5_0)
+        set(SHADER_PROFILE hs_5_1)
 
     elseif(SHADER_FILE MATCHES "\\.ds\\.hlsl$")
-        set(SHADER_PROFILE ds_5_0)
+        set(SHADER_PROFILE ds_5_1)
 
     else()
         message(WARNING
