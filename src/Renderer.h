@@ -10,6 +10,8 @@
 #include <chrono>
 #include <DirectXMath.h>
 
+#include "ConstantBuffer.h"
+
 // Vertex data for a colored cube.
 struct VertexPosColor
 {
@@ -104,6 +106,8 @@ private:
 	bool m_ContentLoaded;
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_CBVDescriptorHeap;
+
+	std::unique_ptr<ConstantBuffer> m_constantBuffer;
 
 	/// Initialization helper functions
 	// DirectX12 objects

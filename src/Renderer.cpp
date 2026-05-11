@@ -1,6 +1,7 @@
 #include "Renderer.h"
 
 #include "Helpers.h"
+#include "Data.h"
 
 #include <d3d12.h>
 #include <DirectXMath.h>
@@ -102,7 +103,18 @@ void Renderer::Render()
 
 	DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(m_ModelMatrix, m_ViewMatrix);
 	mvpMatrix = DirectX::XMMatrixMultiply(mvpMatrix, m_ProjectionMatrix);
-	commandList->SetGraphicsRoot32BitConstants(0, sizeof(DirectX::XMMATRIX) / 4, &mvpMatrix, 0);
+	Cbuffer data = {};
+	data.MVP = mvpMatrix;
+
+	m_constantBuffer->Update( &data, sizeof(Cbuffer));
+
+	ID3D12DescriptorHeap *heaps[] = {
+		m_CBVDescriptorHeap.Get()
+	};
+
+	commandList->SetDescriptorHeaps(1, heaps);
+
+	commandList->SetGraphicsRootDescriptorTable(0, m_constantBuffer->GetGPUDescriptorHandle());
 
 	commandList->DrawIndexedInstanced(_countof(g_Indicies), 1, 0, 0, 0);
 
@@ -371,9 +383,27 @@ bool Renderer::LoadContent()
 		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
 		D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
 
+	// Create constant buffer
+	Cbuffer data = {};
+	data.MVP = DirectX::XMMatrixIdentity();
+
+	m_constantBuffer = std::make_unique<ConstantBuffer>(m_Device, m_CBVDescriptorHeap, 0, &data, sizeof(Cbuffer));
+
 	// A single 32-bit constant root parameter that is used by the vertex shader.
 	CD3DX12_ROOT_PARAMETER1 rootParameters[1];
-	rootParameters[0].InitAsConstants(sizeof(DirectX::XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
+	CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
+
+	ranges[0].Init(
+		D3D12_DESCRIPTOR_RANGE_TYPE_CBV,
+		1,
+		0
+	);
+
+	rootParameters[0].InitAsDescriptorTable(
+		1,
+		ranges,
+		D3D12_SHADER_VISIBILITY_VERTEX
+	);
 
 	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
 	rootSignatureDescription.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, rootSignatureFlags);
