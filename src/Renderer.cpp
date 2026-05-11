@@ -24,7 +24,7 @@ bool Renderer::Initialize()
 	m_SwapChain = CreateSwapChain(m_windowPtr->get()->GetHWND(), m_CommandQueue->GetD3D12CommandQueue(),
 		m_windowPtr->get()->GetWidth(), m_windowPtr->get()->GetHeight(), m_NumFrames);
 	m_CurrentBackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
-	m_RTVDescriptorHeap = CreateDescriptorHeap(m_Device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, m_NumFrames);
+	m_RTVDescriptorHeap = CreateDescriptorHeap(m_Device, m_NumFrames, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	m_RTVDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 	UpdateRenderTargetViews(m_Device, m_SwapChain, m_RTVDescriptorHeap);
@@ -276,13 +276,14 @@ Microsoft::WRL::ComPtr<IDXGISwapChain4> Renderer::CreateSwapChain(HWND hWnd, Mic
 	return dxgiSwapChain4;
 }
 
-Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> Renderer::CreateDescriptorHeap(Microsoft::WRL::ComPtr<ID3D12Device2> device, 
-	D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t numDescriptors) {
+Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> Renderer::CreateDescriptorHeap(Microsoft::WRL::ComPtr<ID3D12Device2> device, uint32_t numDescriptors,
+	D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flags) {
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;
 
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.NumDescriptors = numDescriptors;
 	desc.Type = type;
+	desc.Flags = flags;
 
 	ThrowIfFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&descriptorHeap)));
 
@@ -307,6 +308,8 @@ void Renderer::UpdateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device2> dev
 
 bool Renderer::LoadContent()
 {
+	m_CBVDescriptorHeap = CreateDescriptorHeap(m_Device, 1, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_CommandQueue->GetCommandList();
 
 	// Upload vertex buffer data.
