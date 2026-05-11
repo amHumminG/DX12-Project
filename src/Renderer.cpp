@@ -31,8 +31,9 @@ bool Renderer::Initialize()
 
 	if (!LoadContent()) return false;
 
-	m_Viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(1280), static_cast<float>(720));
+	m_Viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(m_windowPtr->get()->GetWidth()), static_cast<float>(m_windowPtr->get()->GetHeight()));
 	m_ScissorRect = CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX);
+	m_FoV = 45.0f;
 
 	m_ModelMatrix = DirectX::XMMatrixIdentity();
 	m_ViewMatrix = DirectX::XMMatrixIdentity();
@@ -67,6 +68,8 @@ void Renderer::Render()
 		FLOAT clearColor[] = { 0.4f, 0.6f, 0.9f, 1.0f };
 
 		commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+
+		commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	}
 
 	commandList->SetPipelineState(m_PipelineState.Get());
@@ -415,7 +418,7 @@ bool Renderer::LoadContent()
 	m_ContentLoaded = true;
 
 	// Resize/Create the depth buffer.
-	//ResizeDepthBuffer(GetClientWidth(), GetClientHeight());
+	ResizeDepthBuffer(m_windowPtr->get()->GetWidth(), m_windowPtr->get()->GetHeight());
 
 	return true;
 }
@@ -457,5 +460,47 @@ void Renderer::UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommand
 		UpdateSubresources(commandList.Get(),
 			*pDestinationResource, *pIntermediateResource,
 			0, 0, 1, &subresourceData);
+	}
+}
+
+void Renderer::ResizeDepthBuffer(int width, int height)
+{
+	if (m_ContentLoaded)
+	{
+		// Flush any GPU commands that might be referencing the depth buffer.
+		m_CommandQueue->Flush();
+
+		width = std::max(1, width);
+		height = std::max(1, height);
+
+
+		// Resize screen dependent resources.
+		// Create a depth buffer.
+		D3D12_CLEAR_VALUE optimizedClearValue = {};
+		optimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+		optimizedClearValue.DepthStencil = { 1.0f, 0 };
+
+		CD3DX12_HEAP_PROPERTIES heapProperty = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, width, height,
+			1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+
+		ThrowIfFailed(m_Device->CreateCommittedResource(
+			&heapProperty,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_DEPTH_WRITE,
+			&optimizedClearValue,
+			IID_PPV_ARGS(&m_DepthBuffer)
+		));
+
+		// Update the depth-stencil view.
+		D3D12_DEPTH_STENCIL_VIEW_DESC dsv = {};
+		dsv.Format = DXGI_FORMAT_D32_FLOAT;
+		dsv.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+		dsv.Texture2D.MipSlice = 0;
+		dsv.Flags = D3D12_DSV_FLAG_NONE;
+
+		m_Device->CreateDepthStencilView(m_DepthBuffer.Get(), &dsv,
+			m_DSVHeap->GetCPUDescriptorHandleForHeapStart());
 	}
 }
