@@ -15,10 +15,10 @@
 // Vertex data for a colored cube.
 struct VertexPosColor
 {
-	DirectX::XMFLOAT3 Position;
-	DirectX::XMFLOAT3 Color;
+	DirectX::XMFLOAT3 position;
+	DirectX::XMFLOAT3 color;
 };
-static VertexPosColor g_Vertices[8] = {
+static VertexPosColor g_vertices[8] = {
 	{ DirectX::XMFLOAT3(-1.0f, -1.0f, -1.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
 	{ DirectX::XMFLOAT3(-1.0f,  1.0f, -1.0f), DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f) }, // 1
 	{ DirectX::XMFLOAT3(1.0f,  1.0f, -1.0f), DirectX::XMFLOAT3(1.0f, 1.0f, 0.0f) }, // 2
@@ -28,7 +28,7 @@ static VertexPosColor g_Vertices[8] = {
 	{ DirectX::XMFLOAT3(1.0f,  1.0f,  1.0f), DirectX::XMFLOAT3(1.0f, 1.0f, 1.0f) }, // 6
 	{ DirectX::XMFLOAT3(1.0f, -1.0f,  1.0f), DirectX::XMFLOAT3(1.0f, 0.0f, 1.0f) }  // 7
 };
-static WORD g_Indicies[36] =
+static WORD g_indicies[36] =
 {
 	0, 1, 2, 0, 2, 3,
 	4, 6, 5, 4, 7, 6,
@@ -52,55 +52,55 @@ private:
 
 	std::unique_ptr<Window>* m_windowPtr;
 
-	static const uint8_t	m_NumFrames = 3; // The number of swap chain buffers
-	bool					m_UseWarp = false; // WARP adapter
+	static const uint8_t	m_numFrames = 3; // The number of swap chain buffers
+	bool					m_useWarp = false; // WARP adapter
 
 	// DirectX12 objects
-	Microsoft::WRL::ComPtr<ID3D12Device2>			m_Device;
-	std::unique_ptr<CommandQueue>					m_CommandQueue;
-	Microsoft::WRL::ComPtr<IDXGISwapChain4>			m_SwapChain;
-	Microsoft::WRL::ComPtr<ID3D12Resource>			m_BackBuffers[m_NumFrames];
+	Microsoft::WRL::ComPtr<ID3D12Device2>			m_device;
+	std::unique_ptr<CommandQueue>					m_commandQueue;
+	Microsoft::WRL::ComPtr<IDXGISwapChain4>			m_swapChain;
+	Microsoft::WRL::ComPtr<ID3D12Resource>			m_backBuffers[m_numFrames];
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>	m_RTVDescriptorHeap;
 	UINT											m_RTVDescriptorSize;
-	UINT											m_CurrentBackBufferIndex;
+	UINT											m_currentBackBufferIndex;
 
 	// Synchronization objects
-	Microsoft::WRL::ComPtr<ID3D12Fence>	m_Fence;
-	uint64_t							m_FenceValue = 0;
-	uint64_t							m_FrameFenceValues[m_NumFrames] = {};
-	HANDLE								m_FenceEvent;
+	Microsoft::WRL::ComPtr<ID3D12Fence>	m_fence;
+	uint64_t							m_fenceValue = 0;
+	uint64_t							m_frameFenceValues[m_numFrames] = {};
+	HANDLE								m_fenceEvent;
 
 	// Present settings
-	bool m_VSync = true;
-	bool m_TearingSupported = false;
-	bool m_Fullscreen = false;
+	bool m_vSync = true;
+	bool m_tearingSupported = false;
+	bool m_fullscreen = false;
 
 	/// Content objects
 	// Vertex buffer for the cube.
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_VertexBuffer;
-	D3D12_VERTEX_BUFFER_VIEW m_VertexBufferView;
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_vertexBuffer;
+	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 	// Index buffer for the cube.
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_IndexBuffer;
-	D3D12_INDEX_BUFFER_VIEW m_IndexBufferView;
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_indexBuffer;
+	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
 
 	// Depth buffer.
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_DepthBuffer;
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_depthBuffer;
 	// Descriptor heap for depth buffer.
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_DSVHeap;
 
 	// Root signature
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
 
 	// Pipeline state object.
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipelineState;
 
-	D3D12_VIEWPORT m_Viewport;
-	D3D12_RECT m_ScissorRect;
+	D3D12_VIEWPORT m_viewport;
+	D3D12_RECT m_scissorRect;
 
-	float m_FoV;
-	DirectX::XMMATRIX m_ModelMatrix;
+	float m_fov;
+	DirectX::XMMATRIX m_modelMatrix;
 
-	bool m_ContentLoaded;
+	bool m_contentLoaded;
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_CBVDescriptorHeap;
 

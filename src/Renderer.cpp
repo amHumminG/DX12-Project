@@ -19,25 +19,25 @@ bool Renderer::Initialize()
 
 	EnableDebugLayer();
 
-	Microsoft::WRL::ComPtr<IDXGIAdapter4> dxgiAdapter4 = GetAdapter(m_UseWarp);
-	m_Device = CreateDevice(dxgiAdapter4);
-	m_CommandQueue = std::make_unique<CommandQueue>(m_Device, D3D12_COMMAND_LIST_TYPE_DIRECT);
-	m_SwapChain = CreateSwapChain(m_windowPtr->get()->GetHWND(), m_CommandQueue->GetD3D12CommandQueue(),
-		m_windowPtr->get()->GetWidth(), m_windowPtr->get()->GetHeight(), m_NumFrames);
-	m_CurrentBackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
-	m_RTVDescriptorHeap = CreateDescriptorHeap(m_Device, m_NumFrames, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	m_RTVDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	Microsoft::WRL::ComPtr<IDXGIAdapter4> dxgiAdapter4 = GetAdapter(m_useWarp);
+	m_device = CreateDevice(dxgiAdapter4);
+	m_commandQueue = std::make_unique<CommandQueue>(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+	m_swapChain = CreateSwapChain(m_windowPtr->get()->GetHWND(), m_commandQueue->GetD3D12CommandQueue(),
+		m_windowPtr->get()->GetWidth(), m_windowPtr->get()->GetHeight(), m_numFrames);
+	m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+	m_RTVDescriptorHeap = CreateDescriptorHeap(m_device, m_numFrames, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	m_RTVDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
-	UpdateRenderTargetViews(m_Device, m_SwapChain, m_RTVDescriptorHeap);
+	UpdateRenderTargetViews(m_device, m_swapChain, m_RTVDescriptorHeap);
 
-	m_FoV = 45.0f;
+	m_fov = 45.0f;
 
 	if (!LoadContent()) return false;
 
-	m_Viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(m_windowPtr->get()->GetWidth()), static_cast<float>(m_windowPtr->get()->GetHeight()));
-	m_ScissorRect = CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX);
+	m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(m_windowPtr->get()->GetWidth()), static_cast<float>(m_windowPtr->get()->GetHeight()));
+	m_scissorRect = CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX);
 
-	m_ModelMatrix = DirectX::XMMatrixIdentity();
+	m_modelMatrix = DirectX::XMMatrixIdentity();
 
 	m_isInitialized = true;
 
@@ -48,12 +48,12 @@ void Renderer::Render()
 {
 	if (!m_isInitialized) return;
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer = m_BackBuffers[m_CurrentBackBufferIndex];
+	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer = m_backBuffers[m_currentBackBufferIndex];
 
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_CommandQueue->GetCommandList();
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_commandQueue->GetCommandList();
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtv(m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-		m_CurrentBackBufferIndex, m_RTVDescriptorSize);
+		m_currentBackBufferIndex, m_RTVDescriptorSize);
 	D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_DSVHeap->GetCPUDescriptorHandleForHeapStart();
 
 	// Clear the render target
@@ -72,15 +72,15 @@ void Renderer::Render()
 		commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	}
 
-	commandList->SetPipelineState(m_PipelineState.Get());
-	commandList->SetGraphicsRootSignature(m_RootSignature.Get());
+	commandList->SetPipelineState(m_pipelineState.Get());
+	commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->IASetVertexBuffers(0, 1, &m_VertexBufferView);
-	commandList->IASetIndexBuffer(&m_IndexBufferView);
+	commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+	commandList->IASetIndexBuffer(&m_indexBufferView);
 
-	commandList->RSSetViewports(1, &m_Viewport);
-	commandList->RSSetScissorRects(1, &m_ScissorRect);
+	commandList->RSSetViewports(1, &m_viewport);
+	commandList->RSSetScissorRects(1, &m_scissorRect);
 
 	commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
@@ -89,9 +89,9 @@ void Renderer::Render()
 		// Update the model matrix.
 		float angle = static_cast<float>(90.0);
 		const DirectX::XMVECTOR rotationAxis = DirectX::XMVectorSet(0, 1, 1, 0);
-		m_ModelMatrix = DirectX::XMMatrixRotationAxis(rotationAxis, DirectX::XMConvertToRadians(angle));
+		m_modelMatrix = DirectX::XMMatrixRotationAxis(rotationAxis, DirectX::XMConvertToRadians(angle));
 
-		DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(m_ModelMatrix, m_camera.view);
+		DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(m_modelMatrix, m_camera.view);
 		mvpMatrix = DirectX::XMMatrixMultiply(mvpMatrix, m_camera.projection);
 		Cbuffer data = {};
 		data.MVP = mvpMatrix;
@@ -107,7 +107,7 @@ void Renderer::Render()
 
 	commandList->SetGraphicsRootDescriptorTable(0, m_constantBuffer->GetGPUDescriptorHandle());
 
-	commandList->DrawIndexedInstanced(_countof(g_Indicies), 1, 0, 0, 0);
+	commandList->DrawIndexedInstanced(_countof(g_indicies), 1, 0, 0, 0);
 
 	// Present
 	{
@@ -120,16 +120,16 @@ void Renderer::Render()
 		commandList->ResourceBarrier(1, &barrier);
 
 		ID3D12CommandList *const commandLists[] = { commandList.Get() };
-		m_CommandQueue->ExecuteCommandList(commandList);
+		m_commandQueue->ExecuteCommandList(commandList);
 
-		UINT syncInterval = m_VSync ? 1 : 0;
-		UINT presentFlags = m_TearingSupported && !m_VSync ? DXGI_PRESENT_ALLOW_TEARING : 0;
-		ThrowIfFailed(m_SwapChain->Present(syncInterval, presentFlags));
+		UINT syncInterval = m_vSync ? 1 : 0;
+		UINT presentFlags = m_tearingSupported && !m_vSync ? DXGI_PRESENT_ALLOW_TEARING : 0;
+		ThrowIfFailed(m_swapChain->Present(syncInterval, presentFlags));
 
-		uint64_t frameFenceValue = m_CommandQueue->Signal();
+		uint64_t frameFenceValue = m_commandQueue->Signal();
 
-		m_CurrentBackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
-		m_CommandQueue->WaitForFenceValue(frameFenceValue);
+		m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+		m_commandQueue->WaitForFenceValue(frameFenceValue);
 	}
 }
 
@@ -299,12 +299,12 @@ void Renderer::UpdateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device2> dev
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(descriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
-	for (int i = 0; i < m_NumFrames; i++) {
+	for (int i = 0; i < m_numFrames; i++) {
 		Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer;
 		ThrowIfFailed(swapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
 
 		device->CreateRenderTargetView(backBuffer.Get(), nullptr, rtvHandle);
-		m_BackBuffers[i] = backBuffer;
+		m_backBuffers[i] = backBuffer;
 		rtvHandle.Offset(rtvDescriptorSize);
 	}
 }
@@ -321,41 +321,41 @@ bool Renderer::LoadContent()
 
 		// Create the projection matrix.
 		float aspectRatio = 1280 / static_cast<float>(720);
-		m_camera.projection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(m_FoV), aspectRatio, 0.1f, 100.0f);
+		m_camera.projection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(m_fov), aspectRatio, 0.1f, 100.0f);
 	}
 
-	m_CBVDescriptorHeap = CreateDescriptorHeap(m_Device, 1, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+	m_CBVDescriptorHeap = CreateDescriptorHeap(m_device, 1, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
 
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_CommandQueue->GetCommandList();
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_commandQueue->GetCommandList();
 
 	// Upload vertex buffer data.
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateVertexBuffer;
 	UpdateBufferResource(commandList,
-		&m_VertexBuffer, &intermediateVertexBuffer,
-		_countof(g_Vertices), sizeof(VertexPosColor), g_Vertices);
+		&m_vertexBuffer, &intermediateVertexBuffer,
+		_countof(g_vertices), sizeof(VertexPosColor), g_vertices);
 
 	// Create the vertex buffer view.
-	m_VertexBufferView.BufferLocation = m_VertexBuffer->GetGPUVirtualAddress();
-	m_VertexBufferView.SizeInBytes = sizeof(g_Vertices);
-	m_VertexBufferView.StrideInBytes = sizeof(VertexPosColor);
+	m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+	m_vertexBufferView.SizeInBytes = sizeof(g_vertices);
+	m_vertexBufferView.StrideInBytes = sizeof(VertexPosColor);
 
 	// Upload index buffer data.
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateIndexBuffer;
 	UpdateBufferResource(commandList,
-		&m_IndexBuffer, &intermediateIndexBuffer,
-		_countof(g_Indicies), sizeof(WORD), g_Indicies);
+		&m_indexBuffer, &intermediateIndexBuffer,
+		_countof(g_indicies), sizeof(WORD), g_indicies);
 
 	// Create index buffer view.
-	m_IndexBufferView.BufferLocation = m_IndexBuffer->GetGPUVirtualAddress();
-	m_IndexBufferView.Format = DXGI_FORMAT_R16_UINT;
-	m_IndexBufferView.SizeInBytes = sizeof(g_Indicies);
+	m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+	m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
+	m_indexBufferView.SizeInBytes = sizeof(g_indicies);
 
 	// Create the descriptor heap for the depth-stencil view.
 	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
 	dsvHeapDesc.NumDescriptors = 1;
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	ThrowIfFailed(m_Device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_DSVHeap)));
+	ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_DSVHeap)));
 
 	// Load the vertex shader.
 	Microsoft::WRL::ComPtr<ID3DBlob> vertexShaderBlob;
@@ -374,7 +374,7 @@ bool Renderer::LoadContent()
 	// Create a root signature.
 	D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
 	featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-	if (FAILED(m_Device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+	if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
 	{
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
 	}
@@ -391,23 +391,14 @@ bool Renderer::LoadContent()
 	Cbuffer data = {};
 	data.MVP = DirectX::XMMatrixIdentity();
 
-	m_constantBuffer = std::make_unique<ConstantBuffer>(m_Device, m_CBVDescriptorHeap, 0, &data, sizeof(Cbuffer));
+	m_constantBuffer = std::make_unique<ConstantBuffer>(m_device, m_CBVDescriptorHeap, 0, &data, sizeof(Cbuffer));
 
 	// A single 32-bit constant root parameter that is used by the vertex shader.
 	CD3DX12_ROOT_PARAMETER1 rootParameters[1];
 	CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
 
-	ranges[0].Init(
-		D3D12_DESCRIPTOR_RANGE_TYPE_CBV,
-		1,
-		0
-	);
-
-	rootParameters[0].InitAsDescriptorTable(
-		1,
-		ranges,
-		D3D12_SHADER_VISIBILITY_VERTEX
-	);
+	ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	rootParameters[0].InitAsDescriptorTable(1, ranges, D3D12_SHADER_VISIBILITY_VERTEX);
 
 	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
 	rootSignatureDescription.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, rootSignatureFlags);
@@ -418,8 +409,8 @@ bool Renderer::LoadContent()
 	ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDescription,
 		featureData.HighestVersion, &rootSignatureBlob, &errorBlob));
 	// Create the root signature.
-	ThrowIfFailed(m_Device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
-		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_RootSignature)));
+	ThrowIfFailed(m_device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
+		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 
 	struct PipelineStateStream
 	{
@@ -436,7 +427,7 @@ bool Renderer::LoadContent()
 	rtvFormats.NumRenderTargets = 1;
 	rtvFormats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 
-	pipelineStateStream.pRootSignature = m_RootSignature.Get();
+	pipelineStateStream.pRootSignature = m_rootSignature.Get();
 	pipelineStateStream.InputLayout = { inputLayout, _countof(inputLayout) };
 	pipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	pipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
@@ -447,12 +438,12 @@ bool Renderer::LoadContent()
 	D3D12_PIPELINE_STATE_STREAM_DESC pipelineStateStreamDesc = {
 		sizeof(PipelineStateStream), &pipelineStateStream
 	};
-	ThrowIfFailed(m_Device->CreatePipelineState(&pipelineStateStreamDesc, IID_PPV_ARGS(&m_PipelineState)));
+	ThrowIfFailed(m_device->CreatePipelineState(&pipelineStateStreamDesc, IID_PPV_ARGS(&m_pipelineState)));
 
-	auto fenceValue = m_CommandQueue->ExecuteCommandList(commandList);
-	m_CommandQueue->WaitForFenceValue(fenceValue);
+	auto fenceValue = m_commandQueue->ExecuteCommandList(commandList);
+	m_commandQueue->WaitForFenceValue(fenceValue);
 
-	m_ContentLoaded = true;
+	m_contentLoaded = true;
 
 	// Resize/Create the depth buffer.
 	ResizeDepthBuffer(m_windowPtr->get()->GetWidth(), m_windowPtr->get()->GetHeight());
@@ -468,7 +459,7 @@ void Renderer::UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommand
 	// Create a committed resource for the GPU resource in a default heap.
 	CD3DX12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags);
-	ThrowIfFailed(m_Device->CreateCommittedResource(
+	ThrowIfFailed(m_device->CreateCommittedResource(
 		&heapProperties,
 		D3D12_HEAP_FLAG_NONE,
 		&resourceDesc,
@@ -481,7 +472,7 @@ void Renderer::UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommand
 	{
 		heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
-		ThrowIfFailed(m_Device->CreateCommittedResource(
+		ThrowIfFailed(m_device->CreateCommittedResource(
 			&heapProperties,
 			D3D12_HEAP_FLAG_NONE,
 			&resourceDesc,
@@ -502,10 +493,10 @@ void Renderer::UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommand
 
 void Renderer::ResizeDepthBuffer(int width, int height)
 {
-	if (m_ContentLoaded)
+	if (m_contentLoaded)
 	{
 		// Flush any GPU commands that might be referencing the depth buffer.
-		m_CommandQueue->Flush();
+		m_commandQueue->Flush();
 
 		width = std::max(1, width);
 		height = std::max(1, height);
@@ -521,13 +512,13 @@ void Renderer::ResizeDepthBuffer(int width, int height)
 		CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, width, height,
 			1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 
-		ThrowIfFailed(m_Device->CreateCommittedResource(
+		ThrowIfFailed(m_device->CreateCommittedResource(
 			&heapProperty,
 			D3D12_HEAP_FLAG_NONE,
 			&resourceDesc,
 			D3D12_RESOURCE_STATE_DEPTH_WRITE,
 			&optimizedClearValue,
-			IID_PPV_ARGS(&m_DepthBuffer)
+			IID_PPV_ARGS(&m_depthBuffer)
 		));
 
 		// Update the depth-stencil view.
@@ -537,7 +528,7 @@ void Renderer::ResizeDepthBuffer(int width, int height)
 		dsv.Texture2D.MipSlice = 0;
 		dsv.Flags = D3D12_DSV_FLAG_NONE;
 
-		m_Device->CreateDepthStencilView(m_DepthBuffer.Get(), &dsv,
+		m_device->CreateDepthStencilView(m_depthBuffer.Get(), &dsv,
 			m_DSVHeap->GetCPUDescriptorHandleForHeapStart());
 	}
 }
