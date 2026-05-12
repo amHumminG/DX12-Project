@@ -98,15 +98,16 @@ private:
 	D3D12_RECT m_ScissorRect;
 
 	float m_FoV;
-
 	DirectX::XMMATRIX m_ModelMatrix;
-	DirectX::XMMATRIX m_ViewMatrix;
-	DirectX::XMMATRIX m_ProjectionMatrix;
 
 	bool m_ContentLoaded;
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_CBVDescriptorHeap;
 
+	struct Camera {
+		DirectX::XMMATRIX view;
+		DirectX::XMMATRIX projection;
+	}m_camera;
 	std::unique_ptr<ConstantBuffer> m_constantBuffer;
 
 	/// Initialization helper functions

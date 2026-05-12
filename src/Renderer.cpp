@@ -30,15 +30,14 @@ bool Renderer::Initialize()
 
 	UpdateRenderTargetViews(m_Device, m_SwapChain, m_RTVDescriptorHeap);
 
+	m_FoV = 45.0f;
+
 	if (!LoadContent()) return false;
 
 	m_Viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(m_windowPtr->get()->GetWidth()), static_cast<float>(m_windowPtr->get()->GetHeight()));
 	m_ScissorRect = CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX);
-	m_FoV = 45.0f;
 
 	m_ModelMatrix = DirectX::XMMatrixIdentity();
-	m_ViewMatrix = DirectX::XMMatrixIdentity();
-	m_ProjectionMatrix = DirectX::XMMatrixIdentity();
 
 	m_isInitialized = true;
 
@@ -85,28 +84,20 @@ void Renderer::Render()
 
 	commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
-	// Update the MVP matrix
+	// Update constant buffer
+	{
 		// Update the model matrix.
-	float angle = static_cast<float>(90.0);
-	const DirectX::XMVECTOR rotationAxis = DirectX::XMVectorSet(0, 1, 1, 0);
-	m_ModelMatrix = DirectX::XMMatrixRotationAxis(rotationAxis, DirectX::XMConvertToRadians(angle));
+		float angle = static_cast<float>(90.0);
+		const DirectX::XMVECTOR rotationAxis = DirectX::XMVectorSet(0, 1, 1, 0);
+		m_ModelMatrix = DirectX::XMMatrixRotationAxis(rotationAxis, DirectX::XMConvertToRadians(angle));
 
-	// Update the view matrix.
-	const DirectX::XMVECTOR eyePosition = DirectX::XMVectorSet(0, 0, -10, 1);
-	const DirectX::XMVECTOR focusPoint = DirectX::XMVectorSet(0, 0, 0, 1);
-	const DirectX::XMVECTOR upDirection = DirectX::XMVectorSet(0, 1, 0, 0);
-	m_ViewMatrix = DirectX::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
+		DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(m_ModelMatrix, m_camera.view);
+		mvpMatrix = DirectX::XMMatrixMultiply(mvpMatrix, m_camera.projection);
+		Cbuffer data = {};
+		data.MVP = mvpMatrix;
 
-	// Update the projection matrix.
-	float aspectRatio = 1280 / static_cast<float>(720);
-	m_ProjectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(m_FoV), aspectRatio, 0.1f, 100.0f);
-
-	DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(m_ModelMatrix, m_ViewMatrix);
-	mvpMatrix = DirectX::XMMatrixMultiply(mvpMatrix, m_ProjectionMatrix);
-	Cbuffer data = {};
-	data.MVP = mvpMatrix;
-
-	m_constantBuffer->Update( &data, sizeof(Cbuffer));
+		m_constantBuffer->Update(&data, sizeof(Cbuffer));
+	}
 
 	ID3D12DescriptorHeap *heaps[] = {
 		m_CBVDescriptorHeap.Get()
@@ -320,6 +311,19 @@ void Renderer::UpdateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device2> dev
 
 bool Renderer::LoadContent()
 {
+	// Camera matrices
+	{
+		// Create the view matrix.
+		const DirectX::XMVECTOR eyePosition = DirectX::XMVectorSet(0, 0, -10, 1);
+		const DirectX::XMVECTOR focusPoint = DirectX::XMVectorSet(0, 0, 0, 1);
+		const DirectX::XMVECTOR upDirection = DirectX::XMVectorSet(0, 1, 0, 0);
+		m_camera.view = DirectX::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
+
+		// Create the projection matrix.
+		float aspectRatio = 1280 / static_cast<float>(720);
+		m_camera.projection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(m_FoV), aspectRatio, 0.1f, 100.0f);
+	}
+
 	m_CBVDescriptorHeap = CreateDescriptorHeap(m_Device, 1, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
 
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_CommandQueue->GetCommandList();
