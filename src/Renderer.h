@@ -24,6 +24,8 @@ public:
 
 	void Render();
 
+	ConstantBuffer *GetConstantBuffer();
+
 private:
 	bool m_isInitialized = false;
 
@@ -81,10 +83,6 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_CBVDescriptorHeap;
 
-	struct Camera {
-		DirectX::XMMATRIX view;
-		DirectX::XMMATRIX projection;
-	}m_camera;
 	std::unique_ptr<ConstantBuffer> m_constantBuffer;
 
 	/// Initialization helper functions

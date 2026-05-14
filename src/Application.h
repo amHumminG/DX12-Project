@@ -27,4 +27,9 @@ private:
 
 	std::unique_ptr<Window> m_window;
 	std::unique_ptr<Renderer> m_renderer;
+
+	struct Camera {
+		DirectX::XMMATRIX view;
+		DirectX::XMMATRIX projection;
+	}m_camera;
 };
