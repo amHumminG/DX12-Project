@@ -107,7 +107,7 @@ void Renderer::Render()
 
 	commandList->SetGraphicsRootDescriptorTable(0, m_constantBuffer->GetGPUDescriptorHandle());
 
-	commandList->DrawIndexedInstanced(_countof(g_indicies), 1, 0, 0, 0);
+	commandList->DrawIndexedInstanced(_countof(Cube::indices), 1, 0, 0, 0);
 
 	// Present
 	{
@@ -328,27 +328,29 @@ bool Renderer::LoadContent()
 
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_commandQueue->GetCommandList();
 
+	Cube cube;
+
 	// Upload vertex buffer data.
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateVertexBuffer;
 	UpdateBufferResource(commandList,
 		&m_vertexBuffer, &intermediateVertexBuffer,
-		_countof(g_vertices), sizeof(VertexPosColor), g_vertices);
+		_countof(cube.vertices), sizeof(VertexPosColor), cube.vertices);
 
 	// Create the vertex buffer view.
 	m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-	m_vertexBufferView.SizeInBytes = sizeof(g_vertices);
+	m_vertexBufferView.SizeInBytes = sizeof(cube.vertices);
 	m_vertexBufferView.StrideInBytes = sizeof(VertexPosColor);
 
 	// Upload index buffer data.
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateIndexBuffer;
 	UpdateBufferResource(commandList,
 		&m_indexBuffer, &intermediateIndexBuffer,
-		_countof(g_indicies), sizeof(WORD), g_indicies);
+		_countof(cube.indices), sizeof(WORD), cube.indices);
 
 	// Create index buffer view.
 	m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
 	m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
-	m_indexBufferView.SizeInBytes = sizeof(g_indicies);
+	m_indexBufferView.SizeInBytes = sizeof(cube.indices);
 
 	// Create the descriptor heap for the depth-stencil view.
 	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
