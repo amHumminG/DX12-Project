@@ -33,3 +33,16 @@ struct Cube {
 struct Cbuffer {
 	DirectX::XMMATRIX MVP;
 };
+
+struct Camera {
+	DirectX::XMFLOAT3 position;
+	float pad;
+	DirectX::XMFLOAT4X4 viewProj;
+};
+
+struct RayData {
+	unsigned int totalSpotLights;
+	unsigned int totalPointLights;
+	unsigned int frameCount;
+	float pad;
+};

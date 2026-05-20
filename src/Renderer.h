@@ -85,6 +85,9 @@ private:
 
 	std::unique_ptr<ConstantBuffer> m_constantBuffer;
 
+	std::unique_ptr<ConstantBuffer> m_cameraPS;
+	std::unique_ptr<ConstantBuffer> m_rayDataPS;
+
 	/// Initialization helper functions
 	// DirectX12 objects
 	bool CheckTearingSupport();
