@@ -25,10 +25,17 @@ bool Renderer::Initialize()
 	m_swapChain = CreateSwapChain(m_windowPtr->get()->GetHWND(), m_commandQueue->GetD3D12CommandQueue(),
 		m_windowPtr->get()->GetWidth(), m_windowPtr->get()->GetHeight(), m_numFrames);
 	m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
-	m_RTVDescriptorHeap = CreateDescriptorHeap(m_device, m_numFrames, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	m_RTVDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
-	UpdateRenderTargetViews(m_device, m_swapChain, m_RTVDescriptorHeap);
+	// Create descriptor heaps
+	m_rtvDescriptorHeap		= CreateDescriptorHeap(m_device, m_numFrames, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	m_rtvDescriptorSize		= m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	m_dsvDescriptorHeap		= CreateDescriptorHeap(m_device, m_numFrames, D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	m_dsvDescriptorSize		= m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	m_cbvUavDescriptorHeap	= CreateDescriptorHeap(m_device, 10, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+								D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+	m_cbvUavDescriptorSize	= m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	UpdateRenderTargetViews();
 
 	m_fov = 45.0f;
 
@@ -49,12 +56,12 @@ void Renderer::Render()
 	if (!m_isInitialized) return;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer = m_backBuffers[m_currentBackBufferIndex];
-
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_commandQueue->GetCommandList();
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtv(m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-		m_currentBackBufferIndex, m_RTVDescriptorSize);
-	D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_DSVHeap->GetCPUDescriptorHandleForHeapStart();
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtv(m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+		m_currentBackBufferIndex, m_rtvDescriptorSize);
+
+	D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 
 	// Clear the render target
 	{
@@ -72,6 +79,7 @@ void Renderer::Render()
 		commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	}
 
+	// --- Regular Pass ---
 	commandList->SetPipelineState(m_pipelineState.Get());
 	commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 
@@ -84,38 +92,89 @@ void Renderer::Render()
 
 	commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
-	ID3D12DescriptorHeap *heaps[] = {
-		m_CBVDescriptorHeap.Get()
-	};
-
+	ID3D12DescriptorHeap *heaps[] = { m_cbvUavDescriptorHeap.Get() };
 	commandList->SetDescriptorHeaps(1, heaps);
 
 	commandList->SetGraphicsRootDescriptorTable(0, m_constantBuffer->GetGPUDescriptorHandle());
 
 	commandList->DrawIndexedInstanced(_countof(Cube::indices), 1, 0, 0, 0);
 
-	// Present
-	{
+	// --- Compute Pass ---
+	// Transition the back buffer from render target to unordered access
+	if (m_useComputeshaderFog) {
+		auto computeTexture = m_computeOutputTextures[m_currentBackBufferIndex];
+
+		// Set up compute pipeline
+		commandList->SetPipelineState(m_computePipelineState.Get());
+		commandList->SetComputeRootSignature(m_computeRootSignature.Get());
+
+		// Bind the UAV to parameter 0
+		CD3DX12_GPU_DESCRIPTOR_HANDLE uavGpuHandle(
+			m_cbvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
+			m_currentBackBufferIndex,
+			m_cbvUavDescriptorSize
+		);
+		commandList->SetComputeRootDescriptorTable(0, uavGpuHandle);
+
+		// Bind the constant buffer to parameter 1
+		commandList->SetComputeRootDescriptorTable(1, m_constantBuffer->GetGPUDescriptorHandle());
+
+		// Dispatch compute shader
+		commandList->Dispatch((m_windowPtr->get()->GetWidth() + 7) / 8, (m_windowPtr->get()->GetHeight() + 7) / 8, 1);
+
+		// Transition textures so we can copy the compute texture to the back buffer
+		CD3DX12_RESOURCE_BARRIER copyBarriers[2];
+		copyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(
+		computeTexture.Get(),
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_COPY_SOURCE
+		);
+		copyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
+			backBuffer.Get(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_STATE_COPY_DEST
+		);
+		commandList->ResourceBarrier(2, copyBarriers);
+
+		// Copy compute texture to the back buffer
+		commandList->CopyResource(backBuffer.Get(), computeTexture.Get());
+
+		// Transition textures back to their required states for present and next frame
+		CD3DX12_RESOURCE_BARRIER restoreBarriers[2];
+		restoreBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(
+		computeTexture.Get(),
+		D3D12_RESOURCE_STATE_COPY_SOURCE,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+		);
+		restoreBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
+			backBuffer.Get(),
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			D3D12_RESOURCE_STATE_PRESENT
+		);
+		commandList->ResourceBarrier(2, restoreBarriers);
+	}
+	else {
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			backBuffer.Get(),
 			D3D12_RESOURCE_STATE_RENDER_TARGET,
 			D3D12_RESOURCE_STATE_PRESENT
 		);
-
 		commandList->ResourceBarrier(1, &barrier);
-
-		ID3D12CommandList *const commandLists[] = { commandList.Get() };
-		m_commandQueue->ExecuteCommandList(commandList);
-
-		UINT syncInterval = m_vSync ? 1 : 0;
-		UINT presentFlags = m_tearingSupported && !m_vSync ? DXGI_PRESENT_ALLOW_TEARING : 0;
-		ThrowIfFailed(m_swapChain->Present(syncInterval, presentFlags));
-
-		uint64_t frameFenceValue = m_commandQueue->Signal();
-
-		m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
-		m_commandQueue->WaitForFenceValue(frameFenceValue);
 	}
+
+	m_commandQueue->ExecuteCommandList(commandList);
+
+	UINT syncInterval = m_vSync ? 1 : 0;
+	UINT presentFlags = m_tearingSupported && !m_vSync ? DXGI_PRESENT_ALLOW_TEARING : 0;
+	ThrowIfFailed(m_swapChain->Present(syncInterval, presentFlags));
+
+	uint64_t frameFenceValue = m_commandQueue->Signal();
+	m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+	m_commandQueue->WaitForFenceValue(frameFenceValue);
+}
+
+void Renderer::ToggleComputeShaderFog() {
+	m_useComputeshaderFog = !m_useComputeshaderFog;
 }
 
 ConstantBuffer *Renderer::GetConstantBuffer()
@@ -283,26 +342,98 @@ Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> Renderer::CreateDescriptorHeap(Micr
 	return descriptorHeap;
 }
 
-void Renderer::UpdateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device2> device, Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain,
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap) {
-	auto rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+void Renderer::UpdateRenderTargetViews() {
+	m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	m_cbvUavDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(descriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	CD3DX12_CPU_DESCRIPTOR_HANDLE cbvUavHandle(m_cbvUavDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
 	for (int i = 0; i < m_numFrames; i++) {
 		Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer;
-		ThrowIfFailed(swapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
+		ThrowIfFailed(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
 
-		device->CreateRenderTargetView(backBuffer.Get(), nullptr, rtvHandle);
+		m_device->CreateRenderTargetView(backBuffer.Get(), nullptr, rtvHandle);
 		m_backBuffers[i] = backBuffer;
-		rtvHandle.Offset(rtvDescriptorSize);
+
+		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_DEFAULT);
+		CD3DX12_RESOURCE_DESC computeTextureDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+			DXGI_FORMAT_R8G8B8A8_UNORM,
+			m_windowPtr->get()->GetWidth(),
+			m_windowPtr->get()->GetHeight(),
+			1,
+			1,
+			1,
+			0,
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
+		);
+		ThrowIfFailed(m_device->CreateCommittedResource(
+			&heapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&computeTextureDesc,
+			D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+			nullptr,
+			IID_PPV_ARGS(&m_computeOutputTextures[i])
+		));
+
+		m_device->CreateUnorderedAccessView(m_computeOutputTextures[i].Get(), nullptr, nullptr, cbvUavHandle);
+
+		rtvHandle.Offset(m_rtvDescriptorSize);
+		cbvUavHandle.Offset(m_cbvUavDescriptorSize);
 	}
+}
+
+bool Renderer::InitializeComputeRootSignature() {
+	// Output texture (u0)
+	CD3DX12_DESCRIPTOR_RANGE1 uavRange;
+	uavRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+
+	// Camera/light data cbv (b0)
+	CD3DX12_DESCRIPTOR_RANGE1 cbvRange;
+	cbvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+
+	// Create root parameters
+	CD3DX12_ROOT_PARAMETER1 computeRootParameters[2];
+	computeRootParameters[0].InitAsDescriptorTable(1, &uavRange);
+	computeRootParameters[1].InitAsDescriptorTable(1, &cbvRange);
+
+	// Root signature description
+	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC computeRootSignatureDesc;
+	computeRootSignatureDesc.Init_1_1(
+		_countof(computeRootParameters),
+		computeRootParameters,
+		0,
+		nullptr,
+		D3D12_ROOT_SIGNATURE_FLAG_NONE
+	);
+
+	// Serialize and create root signature
+	Microsoft::WRL::ComPtr<ID3DBlob> signature;
+	Microsoft::WRL::ComPtr<ID3DBlob> error;
+	HRESULT hr = D3DX12SerializeVersionedRootSignature(
+		&computeRootSignatureDesc,
+		D3D_ROOT_SIGNATURE_VERSION_1_1,
+		&signature,
+		&error
+	);
+
+	if (FAILED(hr)) {
+		OutputDebugStringA((char*)error->GetBufferPointer());
+		return false;
+	}
+
+	ThrowIfFailed(m_device->CreateRootSignature(
+		0,
+		signature->GetBufferPointer(),
+		signature->GetBufferSize(),
+		IID_PPV_ARGS(&m_computeRootSignature)
+	));
+
+	return true;
 }
 
 bool Renderer::LoadContent()
 {
-	m_CBVDescriptorHeap = CreateDescriptorHeap(m_device, 1, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
-
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_commandQueue->GetCommandList();
 
 	Cube cube;
@@ -328,13 +459,6 @@ bool Renderer::LoadContent()
 	m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
 	m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
 	m_indexBufferView.SizeInBytes = sizeof(cube.indices);
-
-	// Create the descriptor heap for the depth-stencil view.
-	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-	dsvHeapDesc.NumDescriptors = 1;
-	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_DSVHeap)));
 
 	// Load the vertex shader.
 	Microsoft::WRL::ComPtr<ID3DBlob> vertexShaderBlob;
@@ -370,7 +494,7 @@ bool Renderer::LoadContent()
 	Cbuffer data = {};
 	data.MVP = DirectX::XMMatrixIdentity();
 
-	m_constantBuffer = std::make_unique<ConstantBuffer>(m_device, m_CBVDescriptorHeap, 0, &data, sizeof(Cbuffer));
+	m_constantBuffer = std::make_unique<ConstantBuffer>(m_device, m_cbvUavDescriptorHeap, m_numFrames, &data, sizeof(Cbuffer));
 
 	// A single 32-bit constant root parameter that is used by the vertex shader.
 	CD3DX12_ROOT_PARAMETER1 rootParameters[1];
@@ -418,6 +542,49 @@ bool Renderer::LoadContent()
 		sizeof(PipelineStateStream), &pipelineStateStream
 	};
 	ThrowIfFailed(m_device->CreatePipelineState(&pipelineStateStreamDesc, IID_PPV_ARGS(&m_pipelineState)));
+
+	// --- Compute Shader Setup ---
+	Microsoft::WRL::ComPtr<ID3DBlob> computeShaderBlob;
+	ThrowIfFailed(D3DReadFileToBlob(L"ComputeShader.cso", &computeShaderBlob));
+
+	CD3DX12_DESCRIPTOR_RANGE1 uavRange;
+	uavRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1 , 0); // (u0)
+
+	CD3DX12_DESCRIPTOR_RANGE1 cbvRange;
+	cbvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0); // (b0)
+
+	CD3DX12_ROOT_PARAMETER1 computeRootParameters[2];
+	computeRootParameters[0].InitAsDescriptorTable(1, &uavRange);
+	computeRootParameters[1].InitAsDescriptorTable(1, &cbvRange);
+
+	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC computeRootSignatureDesc;
+	computeRootSignatureDesc.Init_1_1(
+		_countof(computeRootParameters),
+		computeRootParameters,
+		0,
+		nullptr,
+		D3D12_ROOT_SIGNATURE_FLAG_NONE
+	);
+
+	Microsoft::WRL::ComPtr<ID3DBlob> computeSignatureBlob;
+	Microsoft::WRL::ComPtr<ID3DBlob> computeErrorBlob;
+	ThrowIfFailed(D3DX12SerializeVersionedRootSignature(
+		&computeRootSignatureDesc,
+		featureData.HighestVersion,
+		&computeSignatureBlob,
+		&computeErrorBlob
+	));
+	ThrowIfFailed(m_device->CreateRootSignature(
+		0,
+		computeSignatureBlob->GetBufferPointer(),
+		computeSignatureBlob->GetBufferSize(),
+		IID_PPV_ARGS(&m_computeRootSignature)
+	));
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC computePipelineStateDesc = {};
+	computePipelineStateDesc.pRootSignature = m_computeRootSignature.Get();
+	computePipelineStateDesc.CS = CD3DX12_SHADER_BYTECODE(computeShaderBlob.Get());
+	ThrowIfFailed(m_device->CreateComputePipelineState(&computePipelineStateDesc, IID_PPV_ARGS(&m_computePipelineState)));
 
 	auto fenceValue = m_commandQueue->ExecuteCommandList(commandList);
 	m_commandQueue->WaitForFenceValue(fenceValue);
@@ -480,7 +647,6 @@ void Renderer::ResizeDepthBuffer(int width, int height)
 		width = std::max(1, width);
 		height = std::max(1, height);
 
-
 		// Resize screen dependent resources.
 		// Create a depth buffer.
 		D3D12_CLEAR_VALUE optimizedClearValue = {};
@@ -500,6 +666,8 @@ void Renderer::ResizeDepthBuffer(int width, int height)
 			IID_PPV_ARGS(&m_depthBuffer)
 		));
 
+		m_dsvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+
 		// Update the depth-stencil view.
 		D3D12_DEPTH_STENCIL_VIEW_DESC dsv = {};
 		dsv.Format = DXGI_FORMAT_D32_FLOAT;
@@ -508,6 +676,6 @@ void Renderer::ResizeDepthBuffer(int width, int height)
 		dsv.Flags = D3D12_DSV_FLAG_NONE;
 
 		m_device->CreateDepthStencilView(m_depthBuffer.Get(), &dsv,
-			m_DSVHeap->GetCPUDescriptorHandleForHeapStart());
+			m_dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 	}
 }
