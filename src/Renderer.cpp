@@ -303,7 +303,7 @@ void Renderer::UpdateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device2> dev
 
 bool Renderer::LoadContent()
 {
-	m_CBVDescriptorHeap = CreateDescriptorHeap(m_device, 3, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+	InitializeConstantBuffers();
 
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_commandQueue->GetCommandList();
 
@@ -352,65 +352,6 @@ bool Renderer::LoadContent()
 		{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 
-	// Create constant buffer
-	Cbuffer data = {};
-	data.MVP = DirectX::XMMatrixIdentity();
-	m_constantBuffer = std::make_unique<ConstantBuffer>(m_device, m_CBVDescriptorHeap, 0, &data, sizeof(Cbuffer));
-
-	Camera camera;
-	camera.position = { 1.0f, 0.0f, 0.0f };
-	DirectX::XMStoreFloat4x4(&camera.viewProj, DirectX::XMMatrixIdentity());
-	m_cameraPS = std::make_unique<ConstantBuffer>(m_device, m_CBVDescriptorHeap, 1, &camera, sizeof(Camera));
-
-	RayData rayData;
-	rayData.totalSpotLights = 0;
-	rayData.totalPointLights = 0;
-	rayData.frameCount = 1;
-	m_rayDataPS = std::make_unique<ConstantBuffer>(m_device, m_CBVDescriptorHeap, 2, &rayData, sizeof(RayData));
-
-	// A single 32-bit constant root parameter that is used by the vertex shader.
-	CD3DX12_ROOT_PARAMETER1 rootParameters[3];
-	CD3DX12_DESCRIPTOR_RANGE1 ranges[3];
-
-	// Vertex b0 data
-	ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
-	rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
-
-	// Pixel b0 camera
-	ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
-	rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
-
-	// Pixel b1 rayData
-	ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
-	rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
-
-	// Allow input layout and deny unnecessary access to certain pipeline stages.
-	D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
-		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-		D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-		D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
-
-	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-	rootSignatureDescription.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, rootSignatureFlags);
-
-	// Create a root signature.
-	D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-	featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-	if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
-	{
-		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-	}
-
-	// Serialize the root signature.
-	Microsoft::WRL::ComPtr<ID3DBlob> rootSignatureBlob;
-	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
-	ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDescription,
-		featureData.HighestVersion, &rootSignatureBlob, &errorBlob));
-	// Create the root signature.
-	ThrowIfFailed(m_device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
-		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
-
 	struct PipelineStateStream
 	{
 		CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
@@ -448,6 +389,75 @@ bool Renderer::LoadContent()
 	ResizeDepthBuffer(m_windowPtr->get()->GetWidth(), m_windowPtr->get()->GetHeight());
 
 	return true;
+}
+
+void Renderer::InitializeConstantBuffers()
+{
+	m_CBVDescriptorHeap = CreateDescriptorHeap(m_device, 3, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+
+	CD3DX12_ROOT_PARAMETER1 rootParameters[3];
+	CD3DX12_DESCRIPTOR_RANGE1 ranges[3];
+
+	// Vertex shader
+	{
+		// b0
+		Cbuffer data = {};
+		data.MVP = DirectX::XMMatrixIdentity();
+		m_constantBuffer = std::make_unique<ConstantBuffer>(m_device, m_CBVDescriptorHeap, 0, &data, sizeof(Cbuffer));
+
+		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
+	}
+
+	// Pixel shader
+	{
+		// b0
+		Camera camera;
+		camera.position = { 1.0f, 0.0f, 0.0f };
+		DirectX::XMStoreFloat4x4(&camera.viewProj, DirectX::XMMatrixIdentity());
+		m_cameraPS = std::make_unique<ConstantBuffer>(m_device, m_CBVDescriptorHeap, 1, &camera, sizeof(Camera));
+
+		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+		rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
+
+		// b1
+		RayData rayData;
+		rayData.totalSpotLights = 0;
+		rayData.totalPointLights = 0;
+		rayData.frameCount = 1;
+		m_rayDataPS = std::make_unique<ConstantBuffer>(m_device, m_CBVDescriptorHeap, 2, &rayData, sizeof(RayData));
+
+		ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
+		rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
+	}
+
+	// Allow input layout and deny unnecessary access to certain pipeline stages.
+	D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+
+	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
+	rootSignatureDescription.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, rootSignatureFlags);
+
+	// Create a root signature.
+	D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+	featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+	if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+	{
+		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+	}
+
+	// Serialize the root signature.
+	Microsoft::WRL::ComPtr<ID3DBlob> rootSignatureBlob;
+	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
+	ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDescription,
+		featureData.HighestVersion, &rootSignatureBlob, &errorBlob));
+
+	// Create the root signature.
+	ThrowIfFailed(m_device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
+		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 }
 
 void Renderer::UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList, ID3D12Resource **pDestinationResource,

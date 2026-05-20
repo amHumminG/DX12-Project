@@ -102,8 +102,10 @@ private:
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap);
 
 	bool LoadContent();
+	void InitializeConstantBuffers();
 	void UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList, ID3D12Resource **pDestinationResource,
 		ID3D12Resource **pIntermediateResource, size_t numElements, size_t elementSize, const void *bufferData, 
 		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
 	void ResizeDepthBuffer(int width, int height);
+
 };
