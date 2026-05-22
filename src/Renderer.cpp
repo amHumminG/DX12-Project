@@ -486,7 +486,7 @@ void Renderer::CreateRootSignature()
 			sbViewDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			sbViewDesc.Buffer.FirstElement = 0;
 			sbViewDesc.Buffer.NumElements = 1; // Number of structs inside the buffer
-			sbViewDesc.Buffer.StructureByteStride = 0; // sizeof(struct);
+			sbViewDesc.Buffer.StructureByteStride = sizeof(int);
 			sbViewDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
 			// Texture2DArray
