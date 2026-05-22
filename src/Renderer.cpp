@@ -395,8 +395,6 @@ bool Renderer::LoadContent()
 			CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
 			CD3DX12_PIPELINE_STATE_STREAM_VS VS;
 			CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-			CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER RasterizerState;
-			CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL DepthStencilState;
 			CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
 			CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
 		} volFogPipelineStateStream;
@@ -404,13 +402,6 @@ bool Renderer::LoadContent()
 		volFogPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		volFogPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(fullscreenVSBlob.Get());
 		volFogPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(volFogPSBlob.Get());
-		CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
-		rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
-		CD3DX12_DEPTH_STENCIL_DESC dsDesc(D3D12_DEFAULT);
-		dsDesc.DepthEnable = FALSE; // Turn off depth testing/writing for full-screen pass
-		dsDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-		volFogPipelineStateStream.DepthStencilState = dsDesc;
-		volFogPipelineStateStream.RasterizerState = rasterizerDesc;
 		volFogPipelineStateStream.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 		volFogPipelineStateStream.RTVFormats = rtvFormats;
 
@@ -437,6 +428,7 @@ void Renderer::CreateRootSignature()
 
 	CD3DX12_ROOT_PARAMETER1 rootParameters[3];
 	CD3DX12_DESCRIPTOR_RANGE1 ranges[3];
+	CD3DX12_STATIC_SAMPLER_DESC staticSampler = {};
 
 	// Vertex shader
 	{
@@ -469,6 +461,14 @@ void Renderer::CreateRootSignature()
 
 		ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
 		rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
+
+		// s0
+		staticSampler.ShaderRegister = 0;
+		staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+		staticSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		staticSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		staticSampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		staticSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	}
 
 	// Allow input layout and deny unnecessary access to certain pipeline stages.
@@ -479,7 +479,7 @@ void Renderer::CreateRootSignature()
 		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 
 	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-	rootSignatureDescription.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, rootSignatureFlags);
+	rootSignatureDescription.Init_1_1(_countof(rootParameters), rootParameters, 1, &staticSampler, rootSignatureFlags);
 
 	// Create a root signature.
 	D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
