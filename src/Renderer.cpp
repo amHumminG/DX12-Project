@@ -91,10 +91,14 @@ void Renderer::Render()
 	commandList->SetDescriptorHeaps(1, heaps);
 
 	commandList->SetGraphicsRootDescriptorTable(0, m_constantBuffer->GetGPUDescriptorHandle());
+	commandList->DrawIndexedInstanced(_countof(Cube::indices), 1, 0, 0, 0);
+
+	commandList->SetPipelineState(m_volFogPSO.Get());
 	commandList->SetGraphicsRootDescriptorTable(1, m_cameraPS->GetGPUDescriptorHandle());
 	commandList->SetGraphicsRootDescriptorTable(2, m_rayDataPS->GetGPUDescriptorHandle());
-
-	commandList->DrawIndexedInstanced(_countof(Cube::indices), 1, 0, 0, 0);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE srvTableHandle(m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), 3, m_resourceDescriptorSize);
+	commandList->SetGraphicsRootDescriptorTable(3, srvTableHandle);
+	//commandList->DrawIndexedInstanced(3, 1, 0, 0, 0);
 
 	// Present
 	{
