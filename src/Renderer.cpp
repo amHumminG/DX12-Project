@@ -303,7 +303,7 @@ void Renderer::UpdateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device2> dev
 
 bool Renderer::LoadContent()
 {
-	InitializeConstantBuffers();
+	CreateRootSignature();
 
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_commandQueue->GetCommandList();
 
@@ -431,7 +431,7 @@ bool Renderer::LoadContent()
 	return true;
 }
 
-void Renderer::InitializeConstantBuffers()
+void Renderer::CreateRootSignature()
 {
 	m_CBVDescriptorHeap = CreateDescriptorHeap(m_device, 3, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
 
