@@ -1,5 +1,5 @@
 Texture2D<float4> colorBuffer : register(t0);
-Texture2D<float4> depthGBuffer : register(t2);
+Texture2D<float4> depthGBuffer : register(t1);
 
 #define SHADOW_EPSILON 0.0001f
 
@@ -51,14 +51,14 @@ struct PointLightBuffer
 
 sampler shadowMapSampler : register(s0);
 
-StructuredBuffer<SpotLightBuffer> spotLights : register(t3);
-Texture2DArray<float> spotShadowMaps : register(t4);
+StructuredBuffer<SpotLightBuffer> spotLights : register(t2);
+Texture2DArray<float> spotShadowMaps : register(t3);
 
-StructuredBuffer<DirectionalLightBuffer> directionalLight : register(t5);
-Texture2DArray<float> dirShadowMaps : register(t6);
+StructuredBuffer<DirectionalLightBuffer> directionalLight : register(t4);
+Texture2DArray<float> dirShadowMaps : register(t5);
 
-StructuredBuffer<PointLightBuffer> pointLights : register(t7);
-TextureCubeArray<float> pointShadowMaps : register(t8);
+StructuredBuffer<PointLightBuffer> pointLights : register(t6);
+TextureCubeArray<float> pointShadowMaps : register(t7);
 
 float PhaseHG(float cosTheta, float g)
 {
