@@ -72,6 +72,7 @@ private:
 
 	// Pipeline state object.
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipelineState;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_volFogPSO; // Pipeline state object for pixel shader volumetric fog
 
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;

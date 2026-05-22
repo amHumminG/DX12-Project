@@ -361,7 +361,7 @@ bool Renderer::LoadContent()
 		CD3DX12_PIPELINE_STATE_STREAM_PS PS;
 		CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
 		CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-	} pipelineStateStream;
+	}pipelineStateStream;
 
 	D3D12_RT_FORMAT_ARRAY rtvFormats = {};
 	rtvFormats.NumRenderTargets = 1;
@@ -379,6 +379,46 @@ bool Renderer::LoadContent()
 		sizeof(PipelineStateStream), &pipelineStateStream
 	};
 	ThrowIfFailed(m_device->CreatePipelineState(&pipelineStateStreamDesc, IID_PPV_ARGS(&m_pipelineState)));
+
+	// Pipeline state for pixel shader volumetric fog
+	{
+		// Load the vertex shader.
+		Microsoft::WRL::ComPtr<ID3DBlob> fullscreenVSBlob;
+		ThrowIfFailed(D3DReadFileToBlob(L"FullScreen.cso", &fullscreenVSBlob));
+
+		// Load the pixel shader.
+		Microsoft::WRL::ComPtr<ID3DBlob> volFogPSBlob;
+		ThrowIfFailed(D3DReadFileToBlob(L"VolumetricFogPS.cso", &volFogPSBlob));
+
+		struct VolumetricFogPSO {
+			CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+			CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+			CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+			CD3DX12_PIPELINE_STATE_STREAM_PS PS;
+			CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER RasterizerState;
+			CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL DepthStencilState;
+			CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
+			CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+		} volFogPipelineStateStream;
+		volFogPipelineStateStream.pRootSignature = m_rootSignature.Get();
+		volFogPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		volFogPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(fullscreenVSBlob.Get());
+		volFogPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(volFogPSBlob.Get());
+		CD3DX12_RASTERIZER_DESC rasterizerDesc(D3D12_DEFAULT);
+		rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+		CD3DX12_DEPTH_STENCIL_DESC dsDesc(D3D12_DEFAULT);
+		dsDesc.DepthEnable = FALSE; // Turn off depth testing/writing for full-screen pass
+		dsDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+		volFogPipelineStateStream.DepthStencilState = dsDesc;
+		volFogPipelineStateStream.RasterizerState = rasterizerDesc;
+		volFogPipelineStateStream.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+		volFogPipelineStateStream.RTVFormats = rtvFormats;
+
+		D3D12_PIPELINE_STATE_STREAM_DESC volFogPipelineStateStreamDesc = {
+			sizeof(VolumetricFogPSO), &volFogPipelineStateStream
+		};
+		ThrowIfFailed(m_device->CreatePipelineState(&volFogPipelineStateStreamDesc, IID_PPV_ARGS(&m_volFogPSO)));
+	}
 
 	auto fenceValue = m_commandQueue->ExecuteCommandList(commandList);
 	m_commandQueue->WaitForFenceValue(fenceValue);
