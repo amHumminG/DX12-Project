@@ -82,7 +82,8 @@ private:
 
 	bool m_contentLoaded;
 
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_CBVDescriptorHeap;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_resourceDescriptorHeap; // Descriptor heap for all resources (CBV & SRV & UAV)
+	UINT m_resourceDescriptorSize;
 
 	std::unique_ptr<ConstantBuffer> m_constantBuffer;
 

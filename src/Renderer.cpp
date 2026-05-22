@@ -85,7 +85,7 @@ void Renderer::Render()
 	commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
 	ID3D12DescriptorHeap *heaps[] = {
-		m_CBVDescriptorHeap.Get()
+		m_resourceDescriptorHeap.Get()
 	};
 
 	commandList->SetDescriptorHeaps(1, heaps);
@@ -424,10 +424,13 @@ bool Renderer::LoadContent()
 
 void Renderer::CreateRootSignature()
 {
-	m_CBVDescriptorHeap = CreateDescriptorHeap(m_device, 3, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+	const unsigned int nResources = 11;
+	m_resourceDescriptorHeap = CreateDescriptorHeap(m_device, nResources, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+	m_resourceDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	CD3DX12_ROOT_PARAMETER1 rootParameters[3];
-	CD3DX12_DESCRIPTOR_RANGE1 ranges[3];
+	const unsigned int nParameters = 4;
+	CD3DX12_ROOT_PARAMETER1 rootParameters[nParameters];
+	CD3DX12_DESCRIPTOR_RANGE1 ranges[nParameters];
 	CD3DX12_STATIC_SAMPLER_DESC staticSampler = {};
 
 	// Vertex shader
@@ -435,7 +438,7 @@ void Renderer::CreateRootSignature()
 		// b0
 		Cbuffer data = {};
 		data.MVP = DirectX::XMMatrixIdentity();
-		m_constantBuffer = std::make_unique<ConstantBuffer>(m_device, m_CBVDescriptorHeap, 0, &data, sizeof(Cbuffer));
+		m_constantBuffer = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 0, &data, sizeof(Cbuffer));
 
 		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
 		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
@@ -447,7 +450,7 @@ void Renderer::CreateRootSignature()
 		Camera camera;
 		camera.position = { 1.0f, 0.0f, 0.0f };
 		DirectX::XMStoreFloat4x4(&camera.viewProj, DirectX::XMMatrixIdentity());
-		m_cameraPS = std::make_unique<ConstantBuffer>(m_device, m_CBVDescriptorHeap, 1, &camera, sizeof(Camera));
+		m_cameraPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 1, &camera, sizeof(Camera));
 
 		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
 		rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -457,10 +460,83 @@ void Renderer::CreateRootSignature()
 		rayData.totalSpotLights = 0;
 		rayData.totalPointLights = 0;
 		rayData.frameCount = 1;
-		m_rayDataPS = std::make_unique<ConstantBuffer>(m_device, m_CBVDescriptorHeap, 2, &rayData, sizeof(RayData));
+		m_rayDataPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 2, &rayData, sizeof(RayData));
 
 		ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
 		rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
+
+		// t0 - t7
+		{
+			ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8, 0);
+			rootParameters[3].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_PIXEL);
+
+			// Texture2D
+			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			srvDesc.Texture2D.MostDetailedMip = 0;
+			srvDesc.Texture2D.MipLevels = 0;
+			srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+			// StructuredBuffer
+			D3D12_SHADER_RESOURCE_VIEW_DESC sbViewDesc = {};
+			sbViewDesc.Format = DXGI_FORMAT_UNKNOWN; // Must be UNKNOWN for structured buffers
+			sbViewDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+			sbViewDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			sbViewDesc.Buffer.FirstElement = 0;
+			sbViewDesc.Buffer.NumElements = 1; // Number of structs inside the buffer
+			sbViewDesc.Buffer.StructureByteStride = 0; // sizeof(struct);
+			sbViewDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+			// Texture2DArray
+			D3D12_SHADER_RESOURCE_VIEW_DESC arrayViewDesc = {};
+			arrayViewDesc.Format = DXGI_FORMAT_R32_FLOAT;
+			arrayViewDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+			arrayViewDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			arrayViewDesc.Texture2DArray.MostDetailedMip = 0;
+			arrayViewDesc.Texture2DArray.MipLevels = 1;
+			arrayViewDesc.Texture2DArray.FirstArraySlice = 0;
+			arrayViewDesc.Texture2DArray.ArraySize = 1; // Total textures in array
+
+			// t0
+			CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_resourceDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 3, m_resourceDescriptorSize);
+			m_device->CreateShaderResourceView(nullptr, &srvDesc, hDescriptor);
+
+			// t1
+			hDescriptor.Offset(1, m_resourceDescriptorSize);
+			m_device->CreateShaderResourceView(nullptr, &srvDesc, hDescriptor);
+
+			// t2
+			hDescriptor.Offset(1, m_resourceDescriptorSize);
+			m_device->CreateShaderResourceView(nullptr, &sbViewDesc, hDescriptor);
+
+			// t3
+			hDescriptor.Offset(1, m_resourceDescriptorSize);
+			m_device->CreateShaderResourceView(nullptr, &arrayViewDesc, hDescriptor);
+
+			// t4
+			hDescriptor.Offset(1, m_resourceDescriptorSize);
+			m_device->CreateShaderResourceView(nullptr, &sbViewDesc, hDescriptor);
+
+			// t5
+			hDescriptor.Offset(1, m_resourceDescriptorSize);
+			m_device->CreateShaderResourceView(nullptr, &arrayViewDesc, hDescriptor);
+
+			// t6
+			hDescriptor.Offset(1, m_resourceDescriptorSize);
+			m_device->CreateShaderResourceView(nullptr, &sbViewDesc, hDescriptor);
+
+			// t7
+			arrayViewDesc = {};
+			arrayViewDesc.Format = DXGI_FORMAT_R32_FLOAT;
+			arrayViewDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
+			arrayViewDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			arrayViewDesc.TextureCubeArray.MostDetailedMip = 0;
+			arrayViewDesc.TextureCubeArray.MipLevels = 1;
+			hDescriptor.Offset(1, m_resourceDescriptorSize);
+			m_device->CreateShaderResourceView(nullptr, &arrayViewDesc, hDescriptor);
+		}
 
 		// s0
 		staticSampler.ShaderRegister = 0;
