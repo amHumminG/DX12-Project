@@ -25,7 +25,7 @@ bool Renderer::Initialize()
 	m_swapChain = CreateSwapChain(m_windowPtr->get()->GetHWND(), m_commandQueue->GetD3D12CommandQueue(),
 		m_windowPtr->get()->GetWidth(), m_windowPtr->get()->GetHeight(), m_numFrames);
 	m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
-	m_RTVDescriptorHeap = CreateDescriptorHeap(m_device, m_numFrames, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	m_RTVDescriptorHeap = CreateDescriptorHeap(m_device, m_numFrames + 1, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	m_RTVDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 	UpdateRenderTargetViews(m_device, m_swapChain, m_RTVDescriptorHeap);
@@ -53,15 +53,23 @@ void Renderer::Render()
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_commandQueue->GetCommandList();
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtv(m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-		m_currentBackBufferIndex, m_RTVDescriptorSize);
+		3, m_RTVDescriptorSize);
 	D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_DSVHeap->GetCPUDescriptorHandleForHeapStart();
 
 	// Clear the render target
 	{
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			backBuffer.Get(),
-			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET
-		);
+		CD3DX12_RESOURCE_BARRIER barrier;
+		if (m_sceneColorState != D3D12_RESOURCE_STATE_RENDER_TARGET)
+		{
+			barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_sceneColor.Get(),
+				m_sceneColorState, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			m_sceneColorState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+			commandList->ResourceBarrier(1, &barrier);
+		}
+
+		barrier = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Get(),
+			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 		commandList->ResourceBarrier(1, &barrier);
 
@@ -93,20 +101,32 @@ void Renderer::Render()
 	commandList->SetGraphicsRootDescriptorTable(0, m_constantBuffer->GetGPUDescriptorHandle());
 	commandList->DrawIndexedInstanced(_countof(Cube::indices), 1, 0, 0, 0);
 
+	{
+		if (m_sceneColorState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+		{
+			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_sceneColor.Get(),
+				m_sceneColorState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			m_sceneColorState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+			commandList->ResourceBarrier(1, &barrier);
+		}
+
+		rtv = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+			m_currentBackBufferIndex, m_RTVDescriptorSize);
+		commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+	}
+
 	commandList->SetPipelineState(m_volFogPSO.Get());
 	commandList->SetGraphicsRootDescriptorTable(1, m_cameraPS->GetGPUDescriptorHandle());
 	commandList->SetGraphicsRootDescriptorTable(2, m_rayDataPS->GetGPUDescriptorHandle());
 	CD3DX12_GPU_DESCRIPTOR_HANDLE srvTableHandle(m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), 3, m_resourceDescriptorSize);
 	commandList->SetGraphicsRootDescriptorTable(3, srvTableHandle);
-	//commandList->DrawIndexedInstanced(3, 1, 0, 0, 0);
+	commandList->DrawInstanced(3, 1, 0, 0);
 
 	// Present
 	{
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			backBuffer.Get(),
-			D3D12_RESOURCE_STATE_RENDER_TARGET,
-			D3D12_RESOURCE_STATE_PRESENT
-		);
+		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Get(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
 		commandList->ResourceBarrier(1, &barrier);
 
@@ -399,14 +419,12 @@ bool Renderer::LoadContent()
 			CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
 			CD3DX12_PIPELINE_STATE_STREAM_VS VS;
 			CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-			CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
 			CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
 		} volFogPipelineStateStream;
 		volFogPipelineStateStream.pRootSignature = m_rootSignature.Get();
 		volFogPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		volFogPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(fullscreenVSBlob.Get());
 		volFogPipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(volFogPSBlob.Get());
-		volFogPipelineStateStream.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 		volFogPipelineStateStream.RTVFormats = rtvFormats;
 
 		D3D12_PIPELINE_STATE_STREAM_DESC volFogPipelineStateStreamDesc = {
@@ -480,7 +498,7 @@ void Renderer::CreateRootSignature()
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			srvDesc.Texture2D.MostDetailedMip = 0;
-			srvDesc.Texture2D.MipLevels = 0;
+			srvDesc.Texture2D.MipLevels = 1;
 			srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 
 			// StructuredBuffer
@@ -505,7 +523,8 @@ void Renderer::CreateRootSignature()
 
 			// t0
 			CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_resourceDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 3, m_resourceDescriptorSize);
-			m_device->CreateShaderResourceView(nullptr, &srvDesc, hDescriptor);
+			SetupVolumetricFogPS();
+			m_device->CreateShaderResourceView(m_sceneColor.Get(), &srvDesc, hDescriptor);
 
 			// t1
 			hDescriptor.Offset(1, m_resourceDescriptorSize);
@@ -578,6 +597,40 @@ void Renderer::CreateRootSignature()
 	// Create the root signature.
 	ThrowIfFailed(m_device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
 		rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+}
+
+void Renderer::SetupVolumetricFogPS()
+{
+	D3D12_RESOURCE_DESC desc = {};
+	desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	desc.Width = m_windowPtr->get()->GetWidth();
+	desc.Height = m_windowPtr->get()->GetHeight();
+	desc.DepthOrArraySize = 1;
+	desc.MipLevels = 1;
+	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	desc.SampleDesc.Count = 1;
+	desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+	D3D12_CLEAR_VALUE clearValue = {};
+	clearValue.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	clearValue.Color[0] = 0.0f;
+	clearValue.Color[1] = 0.0f;
+	clearValue.Color[2] = 0.0f;
+	clearValue.Color[3] = 1.0f;
+
+	D3D12_HEAP_PROPERTIES heapProps = {};
+	heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+	ThrowIfFailed(m_device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &desc,
+		D3D12_RESOURCE_STATE_RENDER_TARGET, &clearValue, IID_PPV_ARGS(&m_sceneColor)));
+	m_sceneColorState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+	rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 3, m_RTVDescriptorSize);
+	m_device->CreateRenderTargetView(m_sceneColor.Get(), &rtvDesc, hDescriptor);
 }
 
 void Renderer::UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList, ID3D12Resource **pDestinationResource,

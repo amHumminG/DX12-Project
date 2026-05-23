@@ -74,6 +74,9 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipelineState;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_volFogPSO; // Pipeline state object for pixel shader volumetric fog
 
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_sceneColor;
+	D3D12_RESOURCE_STATES m_sceneColorState;
+
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;
 
@@ -105,6 +108,7 @@ private:
 
 	bool LoadContent();
 	void CreateRootSignature();
+	void SetupVolumetricFogPS();
 	void UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList, ID3D12Resource **pDestinationResource,
 		ID3D12Resource **pIntermediateResource, size_t numElements, size_t elementSize, const void *bufferData, 
 		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
