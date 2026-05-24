@@ -786,6 +786,7 @@ void Renderer::CreateLights()
 		DirectX::XMStoreFloat4x4(&directional[0].vpMatrix, viewProjMatrix);
 
 		CreateStructuredBuffer(&directional, sizeof(DirectionalLight) * _countof(directional), m_directionalLight);
+		CreateDepthBuffer(width, height, _countof(directional), m_direcationalShadows, 1);
 	}
 }
 
