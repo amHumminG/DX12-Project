@@ -63,10 +63,9 @@ private:
 	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
 
 	// Depth buffer.
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_depthBuffer;
+	DepthBuffer m_depthBuffer;
 	// Descriptor heap for depth buffer.
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_DSVHeap;
-	D3D12_RESOURCE_STATES m_dsvState;
 
 	// Root signature
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
@@ -93,6 +92,9 @@ private:
 	// Structured buffers
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_directionalLight;
 
+	// Shadow maps
+	DepthBuffer m_direcationalShadows;
+
 	/// Initialization helper functions
 	// DirectX12 objects
 	bool CheckTearingSupport();
@@ -113,6 +115,7 @@ private:
 		ID3D12Resource **pIntermediateResource, size_t numElements, size_t elementSize, const void *bufferData, 
 		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
 	void ResizeDepthBuffer(int width, int height);
+	void CreateDepthBuffer(int width, int height, unsigned int nBuffers, DepthBuffer &depthBuffer, uint32_t descriptorIndex);
 
 	void CreateLights();
 	void CreateStructuredBuffer(void *data, UINT64 bufferSize, Microsoft::WRL::ComPtr<ID3D12Resource> &buffer);

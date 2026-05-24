@@ -46,3 +46,6 @@ struct RayData {
 	unsigned int frameCount;
 	float pad;
 };
+
+struct DepthBuffer {
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthBuffer;
