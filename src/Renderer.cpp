@@ -164,6 +164,11 @@ ConstantBuffer *Renderer::GetConstantBuffer()
 	return m_constantBuffer.get();
 }
 
+ConstantBuffer *Renderer::GetRayDataConstantBuffer()
+{
+	return m_rayDataPS.get();
+}
+
 bool Renderer::CheckTearingSupport() {
 	BOOL allowTearing = FALSE;
 

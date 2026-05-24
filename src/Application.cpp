@@ -112,8 +112,10 @@ void Application::OnKeyDown(uint32_t key) {
 void Application::Update(double deltaTime) {
 	// Handle game logic
 	// Update the model matrix.
+	static long frameCount = 0;
 	static double runTime = 0.0;
 	runTime += deltaTime;
+
 	float angle = static_cast<float>(90.0 * runTime);
 	const DirectX::XMVECTOR rotationAxis = DirectX::XMVectorSet(0, 1, 1, 0);
 	DirectX::XMMATRIX modelMatrix = DirectX::XMMatrixRotationAxis(rotationAxis, DirectX::XMConvertToRadians(angle));
@@ -124,6 +126,15 @@ void Application::Update(double deltaTime) {
 	data.MVP = mvpMatrix;
 
 	m_renderer->GetConstantBuffer()->Update(&data, sizeof(Cbuffer));
+
+	RayData rayData;
+	rayData.totalSpotLights = 0;
+	rayData.totalPointLights = 0;
+	rayData.frameCount = frameCount;
+
+	m_renderer->GetRayDataConstantBuffer()->Update(&rayData, sizeof(RayData));
+
+	frameCount++;
 }
 
 void Application::Render() {

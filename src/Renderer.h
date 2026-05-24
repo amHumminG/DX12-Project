@@ -25,6 +25,7 @@ public:
 	void Render();
 
 	ConstantBuffer *GetConstantBuffer();
+	ConstantBuffer *GetRayDataConstantBuffer();
 
 private:
 	bool m_isInitialized = false;
