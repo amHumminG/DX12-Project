@@ -5,6 +5,7 @@
 #include "Window.h"
 #include "CommandQueue.h"
 #include "Data.h"
+#include "Scene.h"
 
 #include <d3d12.h>
 #include <memory>
@@ -22,7 +23,7 @@ public:
 
 	bool Initialize();
 
-	void Render();
+	void RenderScene(const Scene &scene);
 
 	ConstantBuffer *GetConstantBuffer();
 	ConstantBuffer *GetRayDataConstantBuffer();
@@ -86,7 +87,8 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_resourceDescriptorHeap; // Descriptor heap for all resources (CBV & SRV & UAV)
 	UINT m_resourceDescriptorSize;
 
-	std::unique_ptr<ConstantBuffer> m_constantBuffer;
+	std::unique_ptr<ConstantBuffer> m_perObject;
+	std::unique_ptr<ConstantBuffer> m_perFrame;
 	std::unique_ptr<ConstantBuffer> m_cameraPS;
 	std::unique_ptr<ConstantBuffer> m_rayDataPS;
 

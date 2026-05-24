@@ -1,6 +1,17 @@
 #pragma once
 
 #include <DirectXMath.h>
+#include <d3d12.h>
+#include "DX12.h"
+
+struct PerFrame {
+	DirectX::XMFLOAT4X4 view;
+	DirectX::XMFLOAT4X4 proj;
+};
+
+struct PerObject {
+	DirectX::XMFLOAT4X4 model;
+};
 
 struct VertexPosColor
 {
@@ -28,10 +39,6 @@ struct Cube {
 		4, 0, 3, 4, 3, 7
 	};
 	DirectX::XMMATRIX matrix = DirectX::XMMatrixIdentity();
-};
-
-struct Cbuffer {
-	DirectX::XMMATRIX MVP;
 };
 
 struct Camera {
