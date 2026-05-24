@@ -81,18 +81,17 @@ private:
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;
 
-	float m_fov;
-	DirectX::XMMATRIX m_modelMatrix;
-
 	bool m_contentLoaded;
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_resourceDescriptorHeap; // Descriptor heap for all resources (CBV & SRV & UAV)
 	UINT m_resourceDescriptorSize;
 
 	std::unique_ptr<ConstantBuffer> m_constantBuffer;
-
 	std::unique_ptr<ConstantBuffer> m_cameraPS;
 	std::unique_ptr<ConstantBuffer> m_rayDataPS;
+
+	// Structured buffers
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_directionalLight;
 
 	/// Initialization helper functions
 	// DirectX12 objects
@@ -114,5 +113,8 @@ private:
 		ID3D12Resource **pIntermediateResource, size_t numElements, size_t elementSize, const void *bufferData, 
 		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
 	void ResizeDepthBuffer(int width, int height);
+
+	void CreateLights();
+	void CreateStructuredBuffer(void *data, UINT64 bufferSize, Microsoft::WRL::ComPtr<ID3D12Resource> &buffer);
 
 };
