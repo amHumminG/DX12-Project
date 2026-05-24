@@ -49,3 +49,5 @@ struct RayData {
 
 struct DepthBuffer {
 	Microsoft::WRL::ComPtr<ID3D12Resource> depthBuffer;
+	D3D12_RESOURCE_STATES state;
+};
