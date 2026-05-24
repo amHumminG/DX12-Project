@@ -59,8 +59,7 @@ void Renderer::Render()
 	// Clear the render target
 	{
 		CD3DX12_RESOURCE_BARRIER barrier;
-		if (m_sceneColorState != D3D12_RESOURCE_STATE_RENDER_TARGET)
-		{
+		if (m_sceneColorState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
 			barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_sceneColor.Get(),
 				m_sceneColorState, D3D12_RESOURCE_STATE_RENDER_TARGET);
 			m_sceneColorState = D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -72,6 +71,17 @@ void Renderer::Render()
 			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 		commandList->ResourceBarrier(1, &barrier);
+
+		// Transition depth buffer to RTV
+		{
+			if (m_dsvState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+				barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_depthBuffer.Get(),
+					D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+				m_dsvState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+
+				commandList->ResourceBarrier(1, &barrier);
+			}
+		}
 
 		FLOAT clearColor[] = { 0.4f, 0.6f, 0.9f, 1.0f };
 
@@ -114,6 +124,15 @@ void Renderer::Render()
 		rtv = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
 			m_currentBackBufferIndex, m_RTVDescriptorSize);
 		commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+	}
+
+	// Transition depth buffer to SRV
+	if (m_dsvState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_depthBuffer.Get(),
+			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		m_dsvState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+		commandList->ResourceBarrier(1, &barrier);
 	}
 
 	commandList->SetPipelineState(m_volFogPSO.Get());
@@ -327,6 +346,16 @@ void Renderer::UpdateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device2> dev
 
 bool Renderer::LoadContent()
 {
+	// Create the descriptor heap for the depth-stencil view.
+	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
+	dsvHeapDesc.NumDescriptors = 1;
+	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_DSVHeap)));
+
+	// Resize/Create the depth buffer.
+	ResizeDepthBuffer(m_windowPtr->get()->GetWidth(), m_windowPtr->get()->GetHeight());
+
 	CreateRootSignature();
 
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_commandQueue->GetCommandList();
@@ -354,13 +383,6 @@ bool Renderer::LoadContent()
 	m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
 	m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
 	m_indexBufferView.SizeInBytes = sizeof(cube.indices);
-
-	// Create the descriptor heap for the depth-stencil view.
-	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-	dsvHeapDesc.NumDescriptors = 1;
-	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_DSVHeap)));
 
 	// Load the vertex shader.
 	Microsoft::WRL::ComPtr<ID3DBlob> vertexShaderBlob;
@@ -438,9 +460,6 @@ bool Renderer::LoadContent()
 
 	m_contentLoaded = true;
 
-	// Resize/Create the depth buffer.
-	ResizeDepthBuffer(m_windowPtr->get()->GetWidth(), m_windowPtr->get()->GetHeight());
-
 	return true;
 }
 
@@ -470,8 +489,19 @@ void Renderer::CreateRootSignature()
 	{
 		// b0
 		Camera camera;
-		camera.position = { 1.0f, 0.0f, 0.0f };
-		DirectX::XMStoreFloat4x4(&camera.viewProj, DirectX::XMMatrixIdentity());
+		camera.position = { 0.0f, 0.0f, -10.0f };
+
+		// Create the view matrix.
+		const DirectX::XMVECTOR eyePosition = DirectX::XMVectorSet(0, 0, -10, 1);
+		const DirectX::XMVECTOR focusPoint = DirectX::XMVectorSet(0, 0, 0, 1);
+		const DirectX::XMVECTOR upDirection = DirectX::XMVectorSet(0, 1, 0, 0);
+		DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
+
+		// Create the projection matrix.
+		float fov = 45.0f;
+		float aspectRatio = 1280 / static_cast<float>(720);
+		DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fov), aspectRatio, 0.1f, 100.0f);
+		DirectX::XMStoreFloat4x4(&camera.viewProj, DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixMultiply(view, projection)));
 		m_cameraPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 1, &camera, sizeof(Camera));
 
 		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
@@ -521,36 +551,37 @@ void Renderer::CreateRootSignature()
 			arrayViewDesc.Texture2DArray.FirstArraySlice = 0;
 			arrayViewDesc.Texture2DArray.ArraySize = 1; // Total textures in array
 
-			// t0
+			// t0 Scene color
 			CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_resourceDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 3, m_resourceDescriptorSize);
 			SetupVolumetricFogPS();
 			m_device->CreateShaderResourceView(m_sceneColor.Get(), &srvDesc, hDescriptor);
 
-			// t1
+			// t1 Depth buffer
 			hDescriptor.Offset(1, m_resourceDescriptorSize);
-			m_device->CreateShaderResourceView(nullptr, &srvDesc, hDescriptor);
+			srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+			m_device->CreateShaderResourceView(m_depthBuffer.Get(), &srvDesc, hDescriptor);
 
-			// t2
+			// t2 Spotlights
 			hDescriptor.Offset(1, m_resourceDescriptorSize);
 			m_device->CreateShaderResourceView(nullptr, &sbViewDesc, hDescriptor);
 
-			// t3
+			// t3 Spotlights shadow maps
 			hDescriptor.Offset(1, m_resourceDescriptorSize);
 			m_device->CreateShaderResourceView(nullptr, &arrayViewDesc, hDescriptor);
 
-			// t4
+			// t4 Directional light
 			hDescriptor.Offset(1, m_resourceDescriptorSize);
 			m_device->CreateShaderResourceView(nullptr, &sbViewDesc, hDescriptor);
 
-			// t5
+			// t5 Directional shadow map
 			hDescriptor.Offset(1, m_resourceDescriptorSize);
 			m_device->CreateShaderResourceView(nullptr, &arrayViewDesc, hDescriptor);
 
-			// t6
+			// t6 Point lights
 			hDescriptor.Offset(1, m_resourceDescriptorSize);
 			m_device->CreateShaderResourceView(nullptr, &sbViewDesc, hDescriptor);
 
-			// t7
+			// t7 Point lights shadow maps
 			arrayViewDesc = {};
 			arrayViewDesc.Format = DXGI_FORMAT_R32_FLOAT;
 			arrayViewDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
@@ -702,6 +733,7 @@ void Renderer::ResizeDepthBuffer(int width, int height)
 			&optimizedClearValue,
 			IID_PPV_ARGS(&m_depthBuffer)
 		));
+		m_dsvState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
 		// Update the depth-stencil view.
 		D3D12_DEPTH_STENCIL_VIEW_DESC dsv = {};

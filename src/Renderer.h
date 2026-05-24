@@ -66,6 +66,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_depthBuffer;
 	// Descriptor heap for depth buffer.
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_DSVHeap;
+	D3D12_RESOURCE_STATES m_dsvState;
 
 	// Root signature
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
