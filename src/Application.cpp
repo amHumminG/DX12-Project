@@ -42,10 +42,9 @@ bool Application::Initialize() {
 
 	if (!m_window->Initialize()) return false;
 
-	// Initialize renderer here
-	if (!m_renderer->Initialize()) return false;
-
 	m_scene.Initialize();
+
+	if (!m_renderer->Initialize(m_scene)) return false;
 
 	m_isInitialized = true;
 
@@ -118,6 +117,7 @@ void Application::Update(double deltaTime) {
 
 void Application::Render() {
 	// Rendering logic
+	m_renderer->Render(m_scene);
 }
 
 

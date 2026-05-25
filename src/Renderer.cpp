@@ -11,7 +11,7 @@ Renderer::Renderer(std::unique_ptr<Window>* window)
 	m_windowPtr = window;
 }
 
-bool Renderer::Initialize()
+bool Renderer::Initialize(const Scene &scene)
 {
 	if (m_isInitialized) return true;
 
@@ -30,7 +30,7 @@ bool Renderer::Initialize()
 
 	UpdateRenderTargetViews(m_device, m_swapChain, m_RTVDescriptorHeap);
 
-	if (!LoadContent()) return false;
+	if (!LoadContent(scene)) return false;
 
 	m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(m_windowPtr->get()->GetWidth()), static_cast<float>(m_windowPtr->get()->GetHeight()));
 	m_scissorRect = CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX);
@@ -353,12 +353,12 @@ void Renderer::UpdateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device2> dev
 	}
 }
 
-bool Renderer::LoadContent()
+bool Renderer::LoadContent(const Scene &scene)
 {
 	// Resize/Create the depth buffer.
 	ResizeDepthBuffer(m_windowPtr->get()->GetWidth(), m_windowPtr->get()->GetHeight());
 
-	CreateLights();
+	CreateLights(scene);
 
 	CreateRootSignature();
 
@@ -773,37 +773,13 @@ void Renderer::CreateDepthBuffer(int width, int height, unsigned int nBuffers, D
 	m_device->CreateDepthStencilView(depthBuffer.depthBuffer.Get(), &dsv, hDescriptor);
 }
 
-void Renderer::CreateLights()
+void Renderer::CreateLights(const Scene &scene)
 {
 	// Directional light
 	{
-		struct DirectionalLight {
-			DirectX::XMFLOAT4X4 vpMatrix;
-			DirectX::XMFLOAT3 color;
-			DirectX::XMFLOAT3 direction;
-		}directional[1];
-
-		directional[0].color = {1.0f, 0.8f, 0.6f};
-		directional[0].direction = { 4.0f, -8.0f, 2.0f };
-
-		DirectX::XMVECTOR eyePos = { 0.0f, 10.0f, 0.0f }; // Camera pos
-		DirectX::XMVECTOR focusPos = { 0.0f, 0.0f, 0.0f }; // Camera direction
-		DirectX::XMVECTOR upDir = { 0.0f, 0.0f, 1.0f }; // Up direction of camera
-		DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(eyePos, focusPos, upDir);
-
-		float width = 200.0f;
-		float height = 200.0f;
-		float nearZ = 0.1f;
-		float farZ = 100.0f;
-		DirectX::XMMATRIX orthographic = DirectX::XMMatrixOrthographicLH(width, height, nearZ, farZ);
-
-		DirectX::XMMATRIX viewProjMatrix = DirectX::XMMatrixMultiply(view, orthographic); // View before projection
-		viewProjMatrix = DirectX::XMMatrixTranspose(viewProjMatrix);
-
-		DirectX::XMStoreFloat4x4(&directional[0].vpMatrix, viewProjMatrix);
-
-		CreateStructuredBuffer(&directional, sizeof(DirectionalLight) * _countof(directional), m_directionalLight);
-		CreateDepthBuffer(width, height, _countof(directional), m_direcationalShadows, 1);
+		DirectionalLight dirLight = scene.GetDirectionlLight();
+		CreateStructuredBuffer(&dirLight, sizeof(DirectionalLight), m_directionalLight);
+		CreateDepthBuffer(200, 200, 1, m_direcationalShadows, 1);
 	}
 }
 

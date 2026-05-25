@@ -18,9 +18,13 @@ public:
 	const PerFrame &GetCamera() const;
 	const std::vector<PerObject> &GetCubeInstances() const;
 
+	DirectionalLight GetDirectionlLight() const;
+
 private:
 	PerFrame m_camera;
 
 	std::vector<PerObject> m_cubeInstances;
+
+	DirectionalLight m_dirLight;
 
 };

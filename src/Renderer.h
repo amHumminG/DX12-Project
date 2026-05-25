@@ -21,7 +21,7 @@ public:
 	Renderer(std::unique_ptr<Window>* window);
 	~Renderer() = default;
 
-	bool Initialize();
+	bool Initialize(const Scene &scene);
 
 	void Render(const Scene &scene);
 
@@ -111,7 +111,7 @@ private:
 	void UpdateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device2> device, Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain,
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap);
 
-	bool LoadContent();
+	bool LoadContent(const Scene &scene);
 	void CreateRootSignature();
 	void SetupVolumetricFogPS();
 	void UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList, ID3D12Resource **pDestinationResource,
@@ -120,7 +120,7 @@ private:
 	void ResizeDepthBuffer(int width, int height);
 	void CreateDepthBuffer(int width, int height, unsigned int nBuffers, DepthBuffer &depthBuffer, uint32_t descriptorIndex);
 
-	void CreateLights();
+	void CreateLights(const Scene &scene);
 	void CreateStructuredBuffer(void *data, UINT64 bufferSize, Microsoft::WRL::ComPtr<ID3D12Resource> &buffer);
 
 };

@@ -30,6 +30,31 @@ void Scene::Initialize()
 
 		m_cubeInstances.push_back(instance);
 	}
+
+	// Lights
+	{
+		// Directional
+		{
+			m_dirLight.color = { 1.0f, 0.8f, 0.6f };
+			m_dirLight.direction = { 4.0f, -8.0f, 2.0f };
+
+			DirectX::XMVECTOR eyePos = { 0.0f, 10.0f, 0.0f }; // Camera pos
+			DirectX::XMVECTOR focusPos = { 0.0f, 0.0f, 0.0f }; // Camera direction
+			DirectX::XMVECTOR upDir = { 0.0f, 0.0f, 1.0f }; // Up direction of camera
+			DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(eyePos, focusPos, upDir);
+
+			float width = 200.0f;
+			float height = 200.0f;
+			float nearZ = 0.1f;
+			float farZ = 100.0f;
+			DirectX::XMMATRIX orthographic = DirectX::XMMatrixOrthographicLH(width, height, nearZ, farZ);
+
+			DirectX::XMMATRIX viewProjMatrix = DirectX::XMMatrixMultiply(view, orthographic); // View before projection
+			viewProjMatrix = DirectX::XMMatrixTranspose(viewProjMatrix);
+
+			DirectX::XMStoreFloat4x4(&m_dirLight.vpMatrix, viewProjMatrix);
+		}
+	}
 }
 
 void Scene::Update(float deltaTime, float runTime)
@@ -49,4 +74,9 @@ const PerFrame &Scene::GetCamera() const
 const std::vector<PerObject> &Scene::GetCubeInstances() const
 {
 	return m_cubeInstances;
+}
+
+DirectionalLight Scene::GetDirectionlLight() const
+{
+	return m_dirLight;
 }

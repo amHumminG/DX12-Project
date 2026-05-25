@@ -58,3 +58,10 @@ struct DepthBuffer {
 	Microsoft::WRL::ComPtr<ID3D12Resource> depthBuffer;
 	D3D12_RESOURCE_STATES state;
 };
+
+struct DirectionalLight {
+	DirectX::XMFLOAT4X4 vpMatrix;
+	DirectX::XMFLOAT3 color;
+	DirectX::XMFLOAT3 direction;
+};
+
