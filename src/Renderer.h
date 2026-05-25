@@ -24,6 +24,12 @@ public:
 	bool Initialize(const Scene &scene);
 
 	void Render(const Scene &scene);
+	void RenderPSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
+	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer);
+	void RenderCSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
+		Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer);
+
+	void ToggleComputeShaderFog();
 
 	ConstantBuffer *GetConstantBuffer();
 	ConstantBuffer *GetRayDataConstantBuffer();
@@ -41,9 +47,12 @@ private:
 	std::unique_ptr<CommandQueue>					m_commandQueue;
 	Microsoft::WRL::ComPtr<IDXGISwapChain4>			m_swapChain;
 	Microsoft::WRL::ComPtr<ID3D12Resource>			m_backBuffers[m_numFrames];
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>	m_RTVDescriptorHeap;
-	UINT											m_RTVDescriptorSize;
 	UINT											m_currentBackBufferIndex;
+	Microsoft::WRL::ComPtr<ID3D12Resource>			m_computeOutputTextures[m_numFrames];
+
+	// Descriptor heaps
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>	m_rtvDescriptorHeap;
+	UINT											m_rtvDescriptorSize;
 
 	// Synchronization objects
 	Microsoft::WRL::ComPtr<ID3D12Fence>	m_fence;
@@ -66,8 +75,8 @@ private:
 
 	// Depth buffer.
 	DepthBuffer m_depthBuffer;
-	// Descriptor heap for depth buffer.
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_DSVHeap;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_dsvDescriptorHeap; // Descriptor heap for depth buffer.
+	UINT m_dsvDescriptorSize;
 
 	// Root signature
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
@@ -79,6 +88,11 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_sceneColor;
 	D3D12_RESOURCE_STATES m_sceneColorState;
+
+	// Compute shader specific
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_computeRootSignature;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_computePipelineState;
+	bool m_useComputeshaderFog = false;
 
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;
@@ -110,8 +124,8 @@ private:
 		uint32_t width, uint32_t height, uint32_t bufferCount);
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(Microsoft::WRL::ComPtr<ID3D12Device2> device, uint32_t numDescriptors,
 		D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
-	void UpdateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device2> device, Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain,
-		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap);
+	void UpdateRenderTargetViews();
+	bool InitializeComputeRootSignature();
 
 	bool LoadContent(const Scene &scene);
 	void CreateRootSignature();

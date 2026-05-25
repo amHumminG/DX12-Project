@@ -94,6 +94,8 @@ void Application::OnResize(uint32_t width, uint32_t height) {
 
 void Application::OnKeyDown(uint32_t key) {
 	if (key == VK_ESCAPE) Shutdown();
+
+	if (key == 'F') m_renderer->ToggleComputeShaderFog();
 }
 
 void Application::Update(double deltaTime) {
