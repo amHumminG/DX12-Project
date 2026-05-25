@@ -37,12 +37,16 @@ void Scene::Initialize()
 		// Directional
 		{
 			m_dirLight.color = { 1.0f, 0.8f, 0.6f };
-			//m_dirLight.direction = { 4.0f, -8.0f, 2.0f };
-			m_dirLight.direction = { 0.0f, -1.0f, 0.0f };
+			m_dirLight.direction = { 4.0f, -8.0f, 2.0f };
+			DirectX::XMVECTOR direction = DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&m_dirLight.direction));
+			DirectX::XMStoreFloat3(&m_dirLight.direction, direction);
 
 			DirectX::XMVECTOR eyePos = { 0.0f, 10.0f, 0.0f }; // Camera pos
-			DirectX::XMVECTOR focusPos = { 0.0f, 0.0f, 0.0f }; // Camera direction
-			DirectX::XMVECTOR upDir = { 0.0f, 0.0f, 1.0f }; // Up direction of camera
+			DirectX::XMVECTOR focusPos = DirectX::XMVectorAdd(eyePos, direction); // Camera direction
+
+			DirectX::XMVECTOR xAxis = { 1.0f, 0.0, 0.0f };
+			DirectX::XMVECTOR cross = DirectX::XMVector3Cross(xAxis, direction);
+			DirectX::XMVECTOR upDir = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(cross, direction)); // Up direction of camera
 			DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(eyePos, focusPos, upDir);
 			view = DirectX::XMMatrixTranspose(view);
 			DirectX::XMStoreFloat4x4(&m_dirLight.view, view);
