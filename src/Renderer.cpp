@@ -174,7 +174,7 @@ void Renderer::RenderPSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> co
 
 	// Bind SRV table
 	CD3DX12_GPU_DESCRIPTOR_HANDLE srvTableHandle(m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
-		4, m_resourceDescriptorSize);
+		5, m_resourceDescriptorSize);
 	commandList->SetGraphicsRootDescriptorTable(4, srvTableHandle);
 
 	commandList->DrawInstanced(3, 1, 0, 0);
@@ -708,10 +708,6 @@ bool Renderer::LoadContent(const Scene &scene)
 
 void Renderer::CreateRootSignature()
 {
-	const unsigned int nResources = 13;
-	m_resourceDescriptorHeap = CreateDescriptorHeap(m_device, nResources, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
-	m_resourceDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
 	const unsigned int nParameters = 5;
 	CD3DX12_ROOT_PARAMETER1 rootParameters[nParameters];
 	CD3DX12_DESCRIPTOR_RANGE1 ranges[nParameters];
