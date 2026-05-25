@@ -23,7 +23,7 @@ public:
 
 	bool Initialize();
 
-	void RenderScene(const Scene &scene);
+	void Render(const Scene &scene);
 
 	ConstantBuffer *GetConstantBuffer();
 	ConstantBuffer *GetRayDataConstantBuffer();

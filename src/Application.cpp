@@ -118,7 +118,6 @@ void Application::Update(double deltaTime) {
 
 void Application::Render() {
 	// Rendering logic
-	m_renderer->RenderScene(m_scene);
 }
 
 

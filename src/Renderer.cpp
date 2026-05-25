@@ -40,7 +40,7 @@ bool Renderer::Initialize()
 	return true;
 }
 
-void Renderer::RenderScene(const Scene &scene)
+void Renderer::Render(const Scene &scene)
 {
 	if (!m_isInitialized) return;
 
