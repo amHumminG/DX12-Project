@@ -1,5 +1,4 @@
 #include "Scene.h"
-#include "Scene.h"
 
 void Scene::Initialize()
 {
