@@ -112,6 +112,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_directionalLight;
 
 	// Shadow maps
+	UINT m_shadowMapSize = 1024;
 	DepthBuffer m_directionalShadows;
 
 	/// Initialization helper functions

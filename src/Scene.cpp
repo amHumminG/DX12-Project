@@ -47,8 +47,8 @@ void Scene::Initialize()
 			view = DirectX::XMMatrixTranspose(view);
 			DirectX::XMStoreFloat4x4(&m_dirLight.view, view);
 
-			float width = 200.0f;
-			float height = 200.0f;
+			float width = 10.0f;
+			float height = 10.0f;
 			float nearZ = 0.1f;
 			float farZ = 100.0f;
 			DirectX::XMMATRIX orthographic = DirectX::XMMatrixOrthographicLH(width, height, nearZ, farZ);

@@ -1045,7 +1045,7 @@ void Renderer::CreateLights(const Scene &scene)
 	{
 		DirectionalLight dirLight = scene.GetDirectionlLight();
 		CreateStructuredBuffer(&dirLight, sizeof(DirectionalLight), m_directionalLight);
-		CreateDepthBuffer(1024, 1024, 1, m_directionalShadows, 1);
+		CreateDepthBuffer(m_shadowMapSize, m_shadowMapSize, 1, m_directionalShadows, 1);
 	}
 }
 
@@ -1105,7 +1105,7 @@ void Renderer::CreateStructuredBuffer(void *data, UINT64 bufferSize, Microsoft::
 
 void Renderer::RenderShadowMaps(const Scene &scene, Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList)
 {
-	static D3D12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, 1024.0f, 1024.0f, 0.0f, 1.0f);
+	static D3D12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, m_shadowMapSize, m_shadowMapSize, 0.0f, 1.0f);
 	commandList->RSSetViewports(1, &viewport);
 	commandList->RSSetScissorRects(1, &m_scissorRect);
 
