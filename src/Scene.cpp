@@ -41,7 +41,7 @@ void Scene::Initialize()
 			DirectX::XMVECTOR direction = DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&m_dirLight.direction));
 			DirectX::XMStoreFloat3(&m_dirLight.direction, direction);
 
-			DirectX::XMVECTOR eyePos = { 0.0f, 10.0f, 0.0f }; // Camera pos
+			DirectX::XMVECTOR eyePos = DirectX::XMVectorMultiply(direction, { -10.0f, -10.0f, -10.0f }); // Camera pos
 			DirectX::XMVECTOR focusPos = DirectX::XMVectorAdd(eyePos, direction); // Camera direction
 
 			DirectX::XMVECTOR xAxis = { 1.0f, 0.0, 0.0f };
