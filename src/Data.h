@@ -1,6 +1,17 @@
 #pragma once
 
 #include <DirectXMath.h>
+#include <d3d12.h>
+#include "DX12.h"
+
+struct PerFrame {
+	DirectX::XMFLOAT4X4 view;
+	DirectX::XMFLOAT4X4 proj;
+};
+
+struct PerObject {
+	DirectX::XMFLOAT4X4 model;
+};
 
 struct VertexPosColor
 {
@@ -30,6 +41,27 @@ struct Cube {
 	DirectX::XMMATRIX matrix = DirectX::XMMatrixIdentity();
 };
 
-struct Cbuffer {
-	DirectX::XMMATRIX MVP;
+struct Camera {
+	DirectX::XMFLOAT3 position;
+	float pad;
+	DirectX::XMFLOAT4X4 viewProj;
 };
+
+struct RayData {
+	unsigned int totalSpotLights;
+	unsigned int totalPointLights;
+	unsigned int frameCount;
+	float pad;
+};
+
+struct DepthBuffer {
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthBuffer;
+	D3D12_RESOURCE_STATES state;
+};
+
+struct DirectionalLight {
+	DirectX::XMFLOAT4X4 vpMatrix;
+	DirectX::XMFLOAT3 color;
+	DirectX::XMFLOAT3 direction;
+};
+

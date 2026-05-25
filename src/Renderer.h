@@ -5,6 +5,7 @@
 #include "Window.h"
 #include "CommandQueue.h"
 #include "Data.h"
+#include "Scene.h"
 
 #include <d3d12.h>
 #include <memory>
@@ -20,12 +21,14 @@ public:
 	Renderer(std::unique_ptr<Window>* window);
 	~Renderer() = default;
 
-	bool Initialize();
-	void Render();
+	bool Initialize(const Scene &scene);
+
+	void Render(const Scene &scene);
 
 	void ToggleComputeShaderFog();
 
 	ConstantBuffer *GetConstantBuffer();
+	ConstantBuffer *GetRayDataConstantBuffer();
 
 private:
 	bool m_isInitialized = false;
@@ -46,8 +49,6 @@ private:
 	// Descriptor heaps
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>	m_rtvDescriptorHeap;
 	UINT											m_rtvDescriptorSize;
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>	m_dsvDescriptorHeap;
-	UINT											m_dsvDescriptorSize;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>	m_cbvUavDescriptorHeap;
 	UINT											m_cbvUavDescriptorSize;
 
@@ -72,12 +73,19 @@ private:
 
 	// Depth buffer.
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_depthBuffer;
+	DepthBuffer m_depthBuffer;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_dsvDescriptorHeap; // Descriptor heap for depth buffer.
+	UINT m_dsvDescriptorSize;
 
 	// Root signature
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
 
 	// Pipeline state object.
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipelineState;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_volFogPSO; // Pipeline state object for pixel shader volumetric fog
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_sceneColor;
+	D3D12_RESOURCE_STATES m_sceneColorState;
 
 	// Compute shader specific
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_computeRootSignature;
@@ -87,12 +95,21 @@ private:
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;
 
-	float m_fov;
-	DirectX::XMMATRIX m_modelMatrix;
-
 	bool m_contentLoaded;
 
-	std::unique_ptr<ConstantBuffer> m_constantBuffer;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_resourceDescriptorHeap; // Descriptor heap for all resources (CBV & SRV & UAV)
+	UINT m_resourceDescriptorSize;
+
+	std::unique_ptr<ConstantBuffer> m_perObject;
+	std::unique_ptr<ConstantBuffer> m_perFrame;
+	std::unique_ptr<ConstantBuffer> m_cameraPS;
+	std::unique_ptr<ConstantBuffer> m_rayDataPS;
+
+	// Structured buffers
+	Microsoft::WRL::ComPtr<ID3D12Resource> m_directionalLight;
+
+	// Shadow maps
+	DepthBuffer m_direcationalShadows;
 
 	/// Initialization helper functions
 	// DirectX12 objects
@@ -107,9 +124,16 @@ private:
 	void UpdateRenderTargetViews();
 	bool InitializeComputeRootSignature();
 
-	bool LoadContent();
+	bool LoadContent(const Scene &scene);
+	void CreateRootSignature();
+	void SetupVolumetricFogPS();
 	void UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList, ID3D12Resource **pDestinationResource,
 		ID3D12Resource **pIntermediateResource, size_t numElements, size_t elementSize, const void *bufferData, 
 		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
 	void ResizeDepthBuffer(int width, int height);
+	void CreateDepthBuffer(int width, int height, unsigned int nBuffers, DepthBuffer &depthBuffer, uint32_t descriptorIndex);
+
+	void CreateLights(const Scene &scene);
+	void CreateStructuredBuffer(void *data, UINT64 bufferSize, Microsoft::WRL::ComPtr<ID3D12Resource> &buffer);
+
 };

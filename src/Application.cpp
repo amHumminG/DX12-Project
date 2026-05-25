@@ -42,22 +42,9 @@ bool Application::Initialize() {
 
 	if (!m_window->Initialize()) return false;
 
-	// Initialize renderer here
-	if (!m_renderer->Initialize()) return false;
+	m_scene.Initialize();
 
-	// Camera matrices
-	{
-		// Create the view matrix.
-		const DirectX::XMVECTOR eyePosition = DirectX::XMVectorSet(0, 0, -10, 1);
-		const DirectX::XMVECTOR focusPoint = DirectX::XMVectorSet(0, 0, 0, 1);
-		const DirectX::XMVECTOR upDirection = DirectX::XMVectorSet(0, 1, 0, 0);
-		m_camera.view = DirectX::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
-
-		// Create the projection matrix.
-		float fov = 45.0f;
-		float aspectRatio = 1280 / static_cast<float>(720);
-		m_camera.projection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fov), aspectRatio, 0.1f, 100.0f);
-	}
+	if (!m_renderer->Initialize(m_scene)) return false;
 
 	m_isInitialized = true;
 
@@ -114,23 +101,25 @@ void Application::OnKeyDown(uint32_t key) {
 void Application::Update(double deltaTime) {
 	// Handle game logic
 	// Update the model matrix.
+	static long frameCount = 0;
 	static double runTime = 0.0;
 	runTime += deltaTime;
-	float angle = static_cast<float>(90.0 * runTime);
-	const DirectX::XMVECTOR rotationAxis = DirectX::XMVectorSet(0, 1, 1, 0);
-	DirectX::XMMATRIX modelMatrix = DirectX::XMMatrixRotationAxis(rotationAxis, DirectX::XMConvertToRadians(angle));
 
-	DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(modelMatrix, m_camera.view);
-	mvpMatrix = DirectX::XMMatrixMultiply(mvpMatrix, m_camera.projection);
-	Cbuffer data = {};
-	data.MVP = mvpMatrix;
+	m_scene.Update(deltaTime, runTime);
 
-	m_renderer->GetConstantBuffer()->Update(&data, sizeof(Cbuffer));
+	RayData rayData;
+	rayData.totalSpotLights = 0;
+	rayData.totalPointLights = 0;
+	rayData.frameCount = frameCount;
+
+	m_renderer->GetRayDataConstantBuffer()->Update(&rayData, sizeof(RayData));
+
+	frameCount++;
 }
 
 void Application::Render() {
 	// Rendering logic
-	m_renderer->Render();
+	m_renderer->Render(m_scene);
 }
 
 

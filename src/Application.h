@@ -2,6 +2,7 @@
 
 #include "Window.h"
 #include "Renderer.h"
+#include "Scene.h"
 
 #include <memory>
 #include <string>
@@ -28,8 +29,5 @@ private:
 	std::unique_ptr<Window> m_window;
 	std::unique_ptr<Renderer> m_renderer;
 
-	struct Camera {
-		DirectX::XMMATRIX view;
-		DirectX::XMMATRIX projection;
-	}m_camera;
+	Scene m_scene;
 };
