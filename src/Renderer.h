@@ -24,6 +24,10 @@ public:
 	bool Initialize(const Scene &scene);
 
 	void Render(const Scene &scene);
+	void RenderPSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
+	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer);
+	void RenderCSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
+		Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer);
 
 	void ToggleComputeShaderFog();
 
@@ -49,8 +53,6 @@ private:
 	// Descriptor heaps
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>	m_rtvDescriptorHeap;
 	UINT											m_rtvDescriptorSize;
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>	m_cbvUavDescriptorHeap;
-	UINT											m_cbvUavDescriptorSize;
 
 	// Synchronization objects
 	Microsoft::WRL::ComPtr<ID3D12Fence>	m_fence;
@@ -72,7 +74,6 @@ private:
 	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
 
 	// Depth buffer.
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_depthBuffer;
 	DepthBuffer m_depthBuffer;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_dsvDescriptorHeap; // Descriptor heap for depth buffer.
 	UINT m_dsvDescriptorSize;
@@ -90,7 +91,7 @@ private:
 	// Compute shader specific
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_computeRootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_computePipelineState;
-	bool m_useComputeshaderFog = true;
+	bool m_useComputeshaderFog = false;
 
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;
