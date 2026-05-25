@@ -37,23 +37,23 @@ void Scene::Initialize()
 		// Directional
 		{
 			m_dirLight.color = { 1.0f, 0.8f, 0.6f };
-			m_dirLight.direction = { 4.0f, -8.0f, 2.0f };
+			//m_dirLight.direction = { 4.0f, -8.0f, 2.0f };
+			m_dirLight.direction = { 0.0f, -1.0f, 0.0f };
 
 			DirectX::XMVECTOR eyePos = { 0.0f, 10.0f, 0.0f }; // Camera pos
 			DirectX::XMVECTOR focusPos = { 0.0f, 0.0f, 0.0f }; // Camera direction
 			DirectX::XMVECTOR upDir = { 0.0f, 0.0f, 1.0f }; // Up direction of camera
 			DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(eyePos, focusPos, upDir);
+			view = DirectX::XMMatrixTranspose(view);
+			DirectX::XMStoreFloat4x4(&m_dirLight.view, view);
 
 			float width = 200.0f;
 			float height = 200.0f;
 			float nearZ = 0.1f;
 			float farZ = 100.0f;
 			DirectX::XMMATRIX orthographic = DirectX::XMMatrixOrthographicLH(width, height, nearZ, farZ);
-
-			DirectX::XMMATRIX viewProjMatrix = DirectX::XMMatrixMultiply(view, orthographic); // View before projection
-			viewProjMatrix = DirectX::XMMatrixTranspose(viewProjMatrix);
-
-			DirectX::XMStoreFloat4x4(&m_dirLight.vpMatrix, viewProjMatrix);
+			orthographic = DirectX::XMMatrixTranspose(orthographic);
+			DirectX::XMStoreFloat4x4(&m_dirLight.proj, orthographic);
 		}
 	}
 }
@@ -84,7 +84,6 @@ void Scene::Update(float deltaTime, float runTime)
 	if (GetAsyncKeyState(VK_LSHIFT) & 0x8000) {
 		m_position.y -= m_moveSpeed * deltaTime;
 	}
-
 
 	// Camera
 	{

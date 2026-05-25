@@ -145,7 +145,7 @@ void Renderer::Render(const Scene &scene)
 	commandList->SetPipelineState(m_volFogPSO.Get());
 	commandList->SetGraphicsRootDescriptorTable(2, m_cameraPS->GetGPUDescriptorHandle());
 	commandList->SetGraphicsRootDescriptorTable(3, m_rayDataPS->GetGPUDescriptorHandle());
-	CD3DX12_GPU_DESCRIPTOR_HANDLE srvTableHandle(m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), 4, m_resourceDescriptorSize);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE srvTableHandle(m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), 5, m_resourceDescriptorSize);
 	commandList->SetGraphicsRootDescriptorTable(4, srvTableHandle);
 	commandList->DrawInstanced(3, 1, 0, 0);
 
@@ -498,7 +498,7 @@ bool Renderer::LoadContent(const Scene &scene)
 
 void Renderer::CreateRootSignature()
 {
-	const unsigned int nResources = 12;
+	const unsigned int nResources = 13;
 	m_resourceDescriptorHeap = CreateDescriptorHeap(m_device, nResources, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
 	m_resourceDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
@@ -512,7 +512,6 @@ void Renderer::CreateRootSignature()
 		// b0
 		PerObject perObject = {};
 		DirectX::XMStoreFloat4x4(&perObject.model, DirectX::XMMatrixIdentity());
-		perObject.model._11 = 2.0f;
 		m_perObject = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 0, &perObject, sizeof(PerObject));
 
 		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
@@ -522,6 +521,7 @@ void Renderer::CreateRootSignature()
 		DirectX::XMStoreFloat4x4(&perFrame.view, DirectX::XMMatrixIdentity());
 		DirectX::XMStoreFloat4x4(&perFrame.proj, DirectX::XMMatrixIdentity());
 		m_perFrame = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 1, &perFrame, sizeof(PerFrame));
+		m_shadowPerFrame = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 2, &perFrame, sizeof(PerFrame));
 
 		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
 		rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_VERTEX);
@@ -544,7 +544,7 @@ void Renderer::CreateRootSignature()
 		float aspectRatio = 1280 / static_cast<float>(720);
 		DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fov), aspectRatio, 0.1f, 100.0f);
 		DirectX::XMStoreFloat4x4(&camera.viewProj, DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixMultiply(view, projection)));
-		m_cameraPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 2, &camera, sizeof(Camera));
+		m_cameraPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 3, &camera, sizeof(Camera));
 
 		ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
 		rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -554,7 +554,7 @@ void Renderer::CreateRootSignature()
 		rayData.totalSpotLights = 0;
 		rayData.totalPointLights = 0;
 		rayData.frameCount = 1;
-		m_rayDataPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 3, &rayData, sizeof(RayData));
+		m_rayDataPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 4, &rayData, sizeof(RayData));
 
 		ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
 		rootParameters[3].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -594,7 +594,7 @@ void Renderer::CreateRootSignature()
 			arrayViewDesc.Texture2DArray.ArraySize = 1; // Total textures in array
 
 			// t0 Scene color
-			CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_resourceDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 4, m_resourceDescriptorSize);
+			CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_resourceDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 5, m_resourceDescriptorSize);
 			SetupVolumetricFogPS();
 			m_device->CreateShaderResourceView(m_sceneColor.Get(), &srvDesc, hDescriptor);
 
@@ -902,10 +902,10 @@ void Renderer::RenderShadowMaps(const Scene &scene, Microsoft::WRL::ComPtr<ID3D1
 	commandList->SetGraphicsRootDescriptorTable(0, m_perObject->GetGPUDescriptorHandle());
 
 	PerFrame perFrame;
-	perFrame.view = scene.GetDirectionlLight().vpMatrix;
-	DirectX::XMStoreFloat4x4(&perFrame.proj, DirectX::XMMatrixIdentity());
-	m_perFrame->Update(&perFrame, sizeof(PerFrame));
-	commandList->SetGraphicsRootDescriptorTable(1, m_perFrame->GetGPUDescriptorHandle());
+	perFrame.view = scene.GetDirectionlLight().view;
+	perFrame.proj = scene.GetDirectionlLight().proj;
+	m_shadowPerFrame->Update(&perFrame, sizeof(PerFrame));
+	commandList->SetGraphicsRootDescriptorTable(1, m_shadowPerFrame->GetGPUDescriptorHandle());
 
 	for (const PerObject &instance : scene.GetCubeInstances()) {
 		m_perObject->Update(&instance, sizeof(PerObject));

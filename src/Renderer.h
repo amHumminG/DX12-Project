@@ -92,6 +92,7 @@ private:
 	std::unique_ptr<ConstantBuffer> m_perFrame;
 	std::unique_ptr<ConstantBuffer> m_cameraPS;
 	std::unique_ptr<ConstantBuffer> m_rayDataPS;
+	std::unique_ptr<ConstantBuffer> m_shadowPerFrame;
 
 	// Structured buffers
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_directionalLight;
