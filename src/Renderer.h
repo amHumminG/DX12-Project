@@ -97,7 +97,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_directionalLight;
 
 	// Shadow maps
-	DepthBuffer m_direcationalShadows;
+	DepthBuffer m_directionalShadows;
 
 	/// Initialization helper functions
 	// DirectX12 objects
@@ -124,4 +124,5 @@ private:
 	void CreateLights(const Scene &scene);
 	void CreateStructuredBuffer(void *data, UINT64 bufferSize, Microsoft::WRL::ComPtr<ID3D12Resource> &buffer);
 
+	void RenderShadowMaps(const Scene &scene, Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList);
 };

@@ -44,8 +44,11 @@ void Renderer::Render(const Scene &scene)
 {
 	if (!m_isInitialized) return;
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer = m_backBuffers[m_currentBackBufferIndex];
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_commandQueue->GetCommandList();
+
+	RenderShadowMaps(scene, commandList);
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer = m_backBuffers[m_currentBackBufferIndex];
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtv(m_RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
 		3, m_RTVDescriptorSize);
@@ -614,7 +617,7 @@ void Renderer::CreateRootSignature()
 
 			// t5 Directional shadow map
 			hDescriptor.Offset(1, m_resourceDescriptorSize);
-			m_device->CreateShaderResourceView(nullptr, &arrayViewDesc, hDescriptor);
+			m_device->CreateShaderResourceView(m_directionalShadows.depthBuffer.Get(), &arrayViewDesc, hDescriptor);
 
 			// t6 Point lights
 			hDescriptor.Offset(1, m_resourceDescriptorSize);
@@ -805,7 +808,7 @@ void Renderer::CreateLights(const Scene &scene)
 	{
 		DirectionalLight dirLight = scene.GetDirectionlLight();
 		CreateStructuredBuffer(&dirLight, sizeof(DirectionalLight), m_directionalLight);
-		CreateDepthBuffer(200, 200, 1, m_direcationalShadows, 1);
+		CreateDepthBuffer(1024, 1024, 1, m_directionalShadows, 1);
 	}
 }
 
@@ -863,3 +866,62 @@ void Renderer::CreateStructuredBuffer(void *data, UINT64 bufferSize, Microsoft::
 	m_commandQueue->Flush();
 }
 
+void Renderer::RenderShadowMaps(const Scene &scene, Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList)
+{
+	static D3D12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, 1024.0f, 1024.0f, 0.0f, 1.0f);
+	commandList->RSSetViewports(1, &viewport);
+	commandList->RSSetScissorRects(1, &m_scissorRect);
+
+	// Transition depth buffer to RTV
+	{
+		if (m_directionalShadows.state != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_directionalShadows.depthBuffer.Get(),
+				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			m_directionalShadows.state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+
+			commandList->ResourceBarrier(1, &barrier);
+		}
+	}
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE dsv(m_DSVHeap->GetCPUDescriptorHandleForHeapStart(), 
+		1, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
+	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+	commandList->SetPipelineState(m_shadowMapPSO.Get());
+	commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	commandList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
+
+	ID3D12DescriptorHeap *heaps[] = {
+		m_resourceDescriptorHeap.Get()
+	};
+	commandList->SetDescriptorHeaps(1, heaps);
+
+	commandList->SetGraphicsRootDescriptorTable(0, m_perObject->GetGPUDescriptorHandle());
+
+	PerFrame perFrame;
+	perFrame.view = scene.GetDirectionlLight().vpMatrix;
+	DirectX::XMStoreFloat4x4(&perFrame.proj, DirectX::XMMatrixIdentity());
+	m_perFrame->Update(&perFrame, sizeof(PerFrame));
+	commandList->SetGraphicsRootDescriptorTable(1, m_perFrame->GetGPUDescriptorHandle());
+
+	for (const PerObject &instance : scene.GetCubeInstances()) {
+		m_perObject->Update(&instance, sizeof(PerObject));
+		commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+		commandList->IASetIndexBuffer(&m_indexBufferView);
+		commandList->DrawIndexedInstanced(_countof(Cube::indices), 1, 0, 0, 0);
+	}
+
+	// Transition depth buffer to SRV
+	{
+		if (m_directionalShadows.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_directionalShadows.depthBuffer.Get(),
+				D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			m_directionalShadows.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+			commandList->ResourceBarrier(1, &barrier);
+		}
+	}
+}
