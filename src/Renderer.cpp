@@ -459,6 +459,32 @@ bool Renderer::LoadContent(const Scene &scene)
 		ThrowIfFailed(m_device->CreatePipelineState(&volFogPipelineStateStreamDesc, IID_PPV_ARGS(&m_volFogPSO)));
 	}
 
+	// Pipeline state for shadow mapping
+	{
+		// Load the vertex shader.
+		ThrowIfFailed(D3DReadFileToBlob(L"VertexShader.cso", &vertexShaderBlob));
+
+		struct ShadowMapPSO {
+			CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+			CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
+			CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+			CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+			CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
+			CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+		} shadowPipelineStateStream;
+		shadowPipelineStateStream.pRootSignature = m_rootSignature.Get();
+		shadowPipelineStateStream.InputLayout = { inputLayout, _countof(inputLayout) };
+		shadowPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		shadowPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
+		shadowPipelineStateStream.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+		shadowPipelineStateStream.RTVFormats = rtvFormats;
+
+		D3D12_PIPELINE_STATE_STREAM_DESC shadowPipelineStateStreamDesc = {
+			sizeof(ShadowMapPSO), &shadowPipelineStateStream
+		};
+		ThrowIfFailed(m_device->CreatePipelineState(&shadowPipelineStateStreamDesc, IID_PPV_ARGS(&m_shadowMapPSO)));
+	}
+
 	auto fenceValue = m_commandQueue->ExecuteCommandList(commandList);
 	m_commandQueue->WaitForFenceValue(fenceValue);
 

@@ -75,6 +75,7 @@ private:
 	// Pipeline state object.
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipelineState;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_volFogPSO; // Pipeline state object for pixel shader volumetric fog
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_shadowMapPSO; // Pipeline state object for shadow mapping
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_sceneColor;
 	D3D12_RESOURCE_STATES m_sceneColorState;
