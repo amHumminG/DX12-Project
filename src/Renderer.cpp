@@ -460,6 +460,7 @@ void Renderer::UpdateRenderTargetViews() {
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 	CD3DX12_CPU_DESCRIPTOR_HANDLE uavHandle(m_resourceDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	uavHandle.Offset(12, m_resourceDescriptorSize);
 
 	for (int i = 0; i < m_numFrames; i++) {
 		Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer;
@@ -732,7 +733,7 @@ void Renderer::CreateRootSignature()
 		// b1
 		RayData rayData;
 		rayData.totalSpotLights = 0;
-		rayData.totalPointLights = 0;
+		rayData.raySteps = 0;
 		rayData.frameCount = 1;
 		m_rayDataPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 3, &rayData, sizeof(RayData));
 

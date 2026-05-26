@@ -109,7 +109,7 @@ void Application::Update(double deltaTime) {
 
 	RayData rayData;
 	rayData.totalSpotLights = 0;
-	rayData.totalPointLights = 0;
+	rayData.raySteps = 0;
 	rayData.frameCount = frameCount;
 
 	m_renderer->GetRayDataConstantBuffer()->Update(&rayData, sizeof(RayData));

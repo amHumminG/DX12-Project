@@ -48,10 +48,9 @@ struct Camera {
 };
 
 struct RayData {
-	unsigned int totalSpotLights;
-	unsigned int totalPointLights;
+	unsigned int raySteps;
 	unsigned int frameCount;
-	float pad;
+	float pad[2];
 };
 
 struct DepthBuffer {
@@ -62,6 +61,8 @@ struct DepthBuffer {
 struct DirectionalLight {
 	DirectX::XMFLOAT4X4 vpMatrix;
 	DirectX::XMFLOAT3 color;
+	float pad1;
 	DirectX::XMFLOAT3 direction;
+	float pad2;
 };
 
