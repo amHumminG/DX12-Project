@@ -25,7 +25,7 @@ public:
 
 	void Render(const Scene &scene);
 	void RenderPSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
-	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer);
+		Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer);
 	void RenderCSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
 		Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer);
 
@@ -84,6 +84,7 @@ private:
 	// Pipeline state object.
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipelineState;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_volFogPSO; // Pipeline state object for pixel shader volumetric fog
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_shadowMapPSO; // Pipeline state object for shadow mapping
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_sceneColor;
 	D3D12_RESOURCE_STATES m_sceneColorState;
@@ -105,12 +106,14 @@ private:
 	std::unique_ptr<ConstantBuffer> m_perFrame;
 	std::unique_ptr<ConstantBuffer> m_cameraPS;
 	std::unique_ptr<ConstantBuffer> m_rayDataPS;
+	std::unique_ptr<ConstantBuffer> m_shadowPerFrame;
 
 	// Structured buffers
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_directionalLight;
 
 	// Shadow maps
-	DepthBuffer m_direcationalShadows;
+	UINT m_shadowMapSize = 1024;
+	DepthBuffer m_directionalShadows;
 
 	/// Initialization helper functions
 	// DirectX12 objects
@@ -137,4 +140,5 @@ private:
 	void CreateLights(const Scene &scene);
 	void CreateStructuredBuffer(void *data, UINT64 bufferSize, Microsoft::WRL::ComPtr<ID3D12Resource> &buffer);
 
+	void RenderShadowMaps(const Scene &scene, Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList);
 };

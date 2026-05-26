@@ -51,8 +51,11 @@ void Renderer::Render(const Scene &scene)
 {
 	if (!m_isInitialized) return;
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer = m_backBuffers[m_currentBackBufferIndex];
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList = m_commandQueue->GetCommandList();
+
+	RenderShadowMaps(scene, commandList);
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer = m_backBuffers[m_currentBackBufferIndex];
 
 	// --- Setup and Clear RTV's and DSV ---
 	CD3DX12_CPU_DESCRIPTOR_HANDLE backBufferRTV(m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
@@ -115,6 +118,9 @@ void Renderer::Render(const Scene &scene)
 	}
 
 	if (!m_useComputeshaderFog) {
+		Camera camera = scene.GetCameraConstBuff();
+		m_cameraPS->Update(&camera, sizeof(Camera));
+
 		RenderPSFog(commandList, backBuffer);
 	}
 	else {
@@ -170,11 +176,8 @@ void Renderer::RenderPSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> co
 	commandList->SetGraphicsRootDescriptorTable(3, m_rayDataPS->GetGPUDescriptorHandle()); // Bind ray data
 
 	// Bind SRV table
-	CD3DX12_GPU_DESCRIPTOR_HANDLE srvTableHandle(
-		m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
-		4,
-		m_resourceDescriptorSize
-	);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE srvTableHandle(m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
+		5, m_resourceDescriptorSize);
 	commandList->SetGraphicsRootDescriptorTable(4, srvTableHandle);
 
 	commandList->DrawInstanced(3, 1, 0, 0);
@@ -673,6 +676,32 @@ bool Renderer::LoadContent(const Scene &scene)
 		ThrowIfFailed(m_device->CreatePipelineState(&volFogPipelineStateStreamDesc, IID_PPV_ARGS(&m_volFogPSO)));
 	}
 
+	// Pipeline state for shadow mapping
+	{
+		// Load the vertex shader.
+		ThrowIfFailed(D3DReadFileToBlob(L"VertexShader.cso", &vertexShaderBlob));
+
+		struct ShadowMapPSO {
+			CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
+			CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
+			CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+			CD3DX12_PIPELINE_STATE_STREAM_VS VS;
+			CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
+			CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+		} shadowPipelineStateStream;
+		shadowPipelineStateStream.pRootSignature = m_rootSignature.Get();
+		shadowPipelineStateStream.InputLayout = { inputLayout, _countof(inputLayout) };
+		shadowPipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		shadowPipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
+		shadowPipelineStateStream.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+		shadowPipelineStateStream.RTVFormats = rtvFormats;
+
+		D3D12_PIPELINE_STATE_STREAM_DESC shadowPipelineStateStreamDesc = {
+			sizeof(ShadowMapPSO), &shadowPipelineStateStream
+		};
+		ThrowIfFailed(m_device->CreatePipelineState(&shadowPipelineStateStreamDesc, IID_PPV_ARGS(&m_shadowMapPSO)));
+	}
+
 	auto fenceValue = m_commandQueue->ExecuteCommandList(commandList);
 	m_commandQueue->WaitForFenceValue(fenceValue);
 
@@ -693,7 +722,6 @@ void Renderer::CreateRootSignature()
 		// b0
 		PerObject perObject = {};
 		DirectX::XMStoreFloat4x4(&perObject.model, DirectX::XMMatrixIdentity());
-		perObject.model._11 = 2.0f;
 		m_perObject = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 0, &perObject, sizeof(PerObject));
 
 		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
@@ -703,6 +731,7 @@ void Renderer::CreateRootSignature()
 		DirectX::XMStoreFloat4x4(&perFrame.view, DirectX::XMMatrixIdentity());
 		DirectX::XMStoreFloat4x4(&perFrame.proj, DirectX::XMMatrixIdentity());
 		m_perFrame = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 1, &perFrame, sizeof(PerFrame));
+		m_shadowPerFrame = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 2, &perFrame, sizeof(PerFrame));
 
 		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
 		rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_VERTEX);
@@ -725,7 +754,7 @@ void Renderer::CreateRootSignature()
 		float aspectRatio = 1280 / static_cast<float>(720);
 		DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fov), aspectRatio, 0.1f, 100.0f);
 		DirectX::XMStoreFloat4x4(&camera.viewProj, DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixMultiply(view, projection)));
-		m_cameraPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 2, &camera, sizeof(Camera));
+		m_cameraPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 3, &camera, sizeof(Camera));
 
 		ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
 		rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -735,7 +764,7 @@ void Renderer::CreateRootSignature()
 		rayData.totalSpotLights = 0;
 		rayData.raySteps = 0;
 		rayData.frameCount = 1;
-		m_rayDataPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 3, &rayData, sizeof(RayData));
+		m_rayDataPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 4, &rayData, sizeof(RayData));
 
 		ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
 		rootParameters[3].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_PIXEL);
@@ -775,7 +804,7 @@ void Renderer::CreateRootSignature()
 			arrayViewDesc.Texture2DArray.ArraySize = 1; // Total textures in array
 
 			// t0 Scene color
-			CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_resourceDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 4, m_resourceDescriptorSize);
+			CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_resourceDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 5, m_resourceDescriptorSize);
 			SetupVolumetricFogPS();
 			m_device->CreateShaderResourceView(m_sceneColor.Get(), &srvDesc, hDescriptor);
 
@@ -798,7 +827,7 @@ void Renderer::CreateRootSignature()
 
 			// t5 Directional shadow map
 			hDescriptor.Offset(1, m_resourceDescriptorSize);
-			m_device->CreateShaderResourceView(nullptr, &arrayViewDesc, hDescriptor);
+			m_device->CreateShaderResourceView(m_directionalShadows.depthBuffer.Get(), &arrayViewDesc, hDescriptor);
 
 			// t6 Point lights
 			hDescriptor.Offset(1, m_resourceDescriptorSize);
@@ -1020,7 +1049,7 @@ void Renderer::CreateLights(const Scene &scene)
 	{
 		DirectionalLight dirLight = scene.GetDirectionlLight();
 		CreateStructuredBuffer(&dirLight, sizeof(DirectionalLight), m_directionalLight);
-		CreateDepthBuffer(200, 200, 1, m_direcationalShadows, 1);
+		CreateDepthBuffer(m_shadowMapSize, m_shadowMapSize, 1, m_directionalShadows, 1);
 	}
 }
 
@@ -1078,3 +1107,62 @@ void Renderer::CreateStructuredBuffer(void *data, UINT64 bufferSize, Microsoft::
 	m_commandQueue->Flush();
 }
 
+void Renderer::RenderShadowMaps(const Scene &scene, Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList)
+{
+	static D3D12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, m_shadowMapSize, m_shadowMapSize, 0.0f, 1.0f);
+	commandList->RSSetViewports(1, &viewport);
+	commandList->RSSetScissorRects(1, &m_scissorRect);
+
+	// Transition depth buffer to RTV
+	{
+		if (m_directionalShadows.state != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_directionalShadows.depthBuffer.Get(),
+				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			m_directionalShadows.state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+
+			commandList->ResourceBarrier(1, &barrier);
+		}
+	}
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE dsv(m_dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+		1, m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
+	commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+	commandList->SetPipelineState(m_shadowMapPSO.Get());
+	commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	commandList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
+
+	ID3D12DescriptorHeap *heaps[] = {
+		m_resourceDescriptorHeap.Get()
+	};
+	commandList->SetDescriptorHeaps(1, heaps);
+
+	commandList->SetGraphicsRootDescriptorTable(0, m_perObject->GetGPUDescriptorHandle());
+
+	PerFrame perFrame;
+	perFrame.view = scene.GetDirectionlLight().view;
+	perFrame.proj = scene.GetDirectionlLight().proj;
+	m_shadowPerFrame->Update(&perFrame, sizeof(PerFrame));
+	commandList->SetGraphicsRootDescriptorTable(1, m_shadowPerFrame->GetGPUDescriptorHandle());
+
+	for (const PerObject &instance : scene.GetCubeInstances()) {
+		m_perObject->Update(&instance, sizeof(PerObject));
+		commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+		commandList->IASetIndexBuffer(&m_indexBufferView);
+		commandList->DrawIndexedInstanced(_countof(Cube::indices), 1, 0, 0, 0);
+	}
+
+	// Transition depth buffer to SRV
+	{
+		if (m_directionalShadows.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_directionalShadows.depthBuffer.Get(),
+				D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			m_directionalShadows.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+			commandList->ResourceBarrier(1, &barrier);
+		}
+	}
+}

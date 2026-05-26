@@ -59,7 +59,8 @@ struct DepthBuffer {
 };
 
 struct DirectionalLight {
-	DirectX::XMFLOAT4X4 vpMatrix;
+	DirectX::XMFLOAT4X4 view;
+	DirectX::XMFLOAT4X4 proj;
 	DirectX::XMFLOAT3 color;
 	float pad1;
 	DirectX::XMFLOAT3 direction;

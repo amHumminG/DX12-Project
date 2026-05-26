@@ -36,7 +36,8 @@ struct SpotLightBuffer
 
 struct DirectionalLightBuffer
 {
-    matrix vpMatrix;
+    float4x4 view;
+    float4x4 proj;
     float3 colour;
     float3 direction;
 };
@@ -161,7 +162,7 @@ float4 main(PixelShaderInput IN) : SV_Target
 
     float3 worldPos = ComputeWorldSpacePosition(uv, depth, viewProj);
 
-    float3 viewDir = worldPos - camPos.xyz;
+    float3 viewDir = worldPos;
     float viewLength = length(viewDir);
     float3 rayDir = normalize(viewDir);
 
@@ -187,7 +188,7 @@ float4 main(PixelShaderInput IN) : SV_Target
         float3 sampleWorldPos = camPos.xyz + rayDir * distTravelled;
         float3 fogSum = 0.0f;
 
-        bool isShadowed = IsSampledPosShadowed(sampleWorldPos, directionalLight[0].vpMatrix, dirShadowMaps, 0);
+        bool isShadowed = IsSampledPosShadowed(sampleWorldPos, mul(directionalLight[0].view, directionalLight[0].proj), dirShadowMaps, 0);
         if (density > 0.0f && !isShadowed)
         {
             float3 toLight =  normalize(-directionalLight[0].direction);
