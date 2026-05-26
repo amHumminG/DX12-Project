@@ -20,6 +20,8 @@ public:
 
 	DirectionalLight GetDirectionlLight() const;
 
+	Camera GetCameraConstBuff() const;
+
 private:
 	DirectX::XMFLOAT3 m_position;
 	DirectX::XMFLOAT3 m_forward;

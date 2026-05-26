@@ -122,3 +122,25 @@ DirectionalLight Scene::GetDirectionlLight() const
 {
 	return m_dirLight;
 }
+
+Camera Scene::GetCameraConstBuff() const
+{
+	// Create the view matrix.
+	const DirectX::XMVECTOR eyePosition = { 0.0f, 0.0f, 0.0f };
+	const DirectX::XMVECTOR focusPoint = DirectX::XMVectorAdd(eyePosition, DirectX::XMLoadFloat3(&m_forward));
+	const DirectX::XMVECTOR upDirection = DirectX::XMVectorSet(0, 1, 0, 0);
+	DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
+	view = DirectX::XMMatrixTranspose(view);
+
+	// Create the projection matrix.
+	float fov = 90.0f;
+	float aspectRatio = 1280 / static_cast<float>(720);
+	DirectX::XMMATRIX proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fov), aspectRatio, 0.1f, 1000.0f);
+	proj = DirectX::XMMatrixTranspose(proj);
+
+	Camera camera;
+	camera.position = m_position;
+	DirectX::XMStoreFloat4x4(&camera.viewProj, DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixMultiply(view, proj)));
+
+	return camera;
+}

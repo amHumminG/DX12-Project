@@ -118,6 +118,9 @@ void Renderer::Render(const Scene &scene)
 	}
 
 	if (!m_useComputeshaderFog) {
+		Camera camera = scene.GetCameraConstBuff();
+		m_cameraPS->Update(&camera, sizeof(Camera));
+
 		RenderPSFog(commandList, backBuffer);
 	}
 	else {

@@ -162,7 +162,7 @@ float4 main(PixelShaderInput IN) : SV_Target
 
     float3 worldPos = ComputeWorldSpacePosition(uv, depth, viewProj);
 
-    float3 viewDir = worldPos - camPos.xyz;
+    float3 viewDir = worldPos;
     float viewLength = length(viewDir);
     float3 rayDir = normalize(viewDir);
 

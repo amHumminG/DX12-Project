@@ -25,7 +25,7 @@ public:
 
 	void Render(const Scene &scene);
 	void RenderPSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
-	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer);
+		Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer);
 	void RenderCSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
 		Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer);
 
