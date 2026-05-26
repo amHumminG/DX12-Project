@@ -33,4 +33,5 @@ private:
 
 	DirectionalLight m_dirLight;
 
+	void UpdateCameraMatrices();
 };

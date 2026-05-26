@@ -8,19 +8,7 @@ void Scene::Initialize()
 		m_forward = { 0.0f, 0.0f, 1.0f };
 
 		// Create the view matrix.
-		const DirectX::XMVECTOR eyePosition = DirectX::XMLoadFloat3(&m_position);
-		const DirectX::XMVECTOR focusPoint = DirectX::XMVectorSet(0, 0, 0, 1);
-		const DirectX::XMVECTOR upDirection = DirectX::XMVectorSet(0, 1, 0, 0);
-		DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
-		view = DirectX::XMMatrixTranspose(view);
-		DirectX::XMStoreFloat4x4(&m_camera.view, view);
-
-		// Create the projection matrix.
-		float fov = 45.0f;
-		float aspectRatio = 1280 / static_cast<float>(720);
-		DirectX::XMMATRIX proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fov), aspectRatio, 0.1f, 100.0f);
-		proj = DirectX::XMMatrixTranspose(proj);
-		DirectX::XMStoreFloat4x4(&m_camera.proj, proj);
+		UpdateCameraMatrices();
 	}
 
 	// Cubes
@@ -91,20 +79,7 @@ void Scene::Update(float deltaTime, float runTime)
 
 	// Camera
 	{
-		// Create the view matrix.
-		const DirectX::XMVECTOR eyePosition = DirectX::XMLoadFloat3(&m_position);
-		const DirectX::XMVECTOR focusPoint = DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&m_position), DirectX::XMLoadFloat3(&m_forward));
-		const DirectX::XMVECTOR upDirection = DirectX::XMVectorSet(0, 1, 0, 0);
-		DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
-		view = DirectX::XMMatrixTranspose(view);
-		DirectX::XMStoreFloat4x4(&m_camera.view, view);
-
-		// Create the projection matrix.
-		float fov = 45.0f;
-		float aspectRatio = 1280 / static_cast<float>(720);
-		DirectX::XMMATRIX proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fov), aspectRatio, 0.1f, 100.0f);
-		proj = DirectX::XMMatrixTranspose(proj);
-		DirectX::XMStoreFloat4x4(&m_camera.proj, proj);
+		UpdateCameraMatrices();
 	}
 }
 
@@ -143,4 +118,22 @@ Camera Scene::GetCameraConstBuff() const
 	DirectX::XMStoreFloat4x4(&camera.viewProj, DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixMultiply(view, proj)));
 
 	return camera;
+}
+
+void Scene::UpdateCameraMatrices()
+{
+	// Create the view matrix.
+	const DirectX::XMVECTOR eyePosition = DirectX::XMLoadFloat3(&m_position);
+	const DirectX::XMVECTOR focusPoint = DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&m_position), DirectX::XMLoadFloat3(&m_forward));
+	const DirectX::XMVECTOR upDirection = DirectX::XMVectorSet(0, 1, 0, 0);
+	DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
+	view = DirectX::XMMatrixTranspose(view);
+	DirectX::XMStoreFloat4x4(&m_camera.view, view);
+
+	// Create the projection matrix.
+	float fov = 90.0f;
+	float aspectRatio = 1280 / static_cast<float>(720);
+	DirectX::XMMATRIX proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fov), aspectRatio, 0.1f, 1000.0f);
+	proj = DirectX::XMMatrixTranspose(proj);
+	DirectX::XMStoreFloat4x4(&m_camera.proj, proj);
 }
