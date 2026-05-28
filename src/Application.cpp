@@ -96,6 +96,14 @@ void Application::OnKeyDown(uint32_t key) {
 	if (key == VK_ESCAPE) Shutdown();
 
 	if (key == 'F') m_renderer->ToggleComputeShaderFog();
+
+	if (key == '1') m_raySteps = 2;
+	if (key == '2') m_raySteps = 4;
+	if (key == '3') m_raySteps = 8;
+	if (key == '4') m_raySteps = 16;
+	if (key == '5') m_raySteps = 32;
+	if (key == '6') m_raySteps = 64;
+	if (key == '7') m_raySteps = 128;
 }
 
 void Application::Update(double deltaTime) {
@@ -108,7 +116,7 @@ void Application::Update(double deltaTime) {
 	m_scene.Update(deltaTime, runTime);
 
 	RayData rayData;
-	rayData.raySteps = 32;
+	rayData.raySteps = m_raySteps;
 	rayData.frameCount = frameCount;
 
 	m_renderer->GetRayDataConstantBuffer()->Update(&rayData, sizeof(RayData));

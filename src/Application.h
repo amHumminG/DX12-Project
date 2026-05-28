@@ -30,4 +30,6 @@ private:
 	std::unique_ptr<Renderer> m_renderer;
 
 	Scene m_scene;
+
+	unsigned int m_raySteps = 32;
 };

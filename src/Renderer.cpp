@@ -143,35 +143,24 @@ void Renderer::RenderPSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> co
 	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer)
 {
 	// Transition the scene color SRV for pixel shader
-	if (m_sceneColorState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+	if (m_sceneColorState != D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE) {
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			m_sceneColor.Get(),
 			m_sceneColorState,
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+			D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE
 		);
-		m_sceneColorState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		m_sceneColorState = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
 		commandList->ResourceBarrier(1, &barrier);
 	}
 
 	// Transition the depth buffer to an SRV for pixel shader
-	if (m_depthBuffer.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+	if (m_depthBuffer.state != D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE) {
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			m_depthBuffer.depthBuffer.Get(),
 			m_depthBuffer.state,
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+			D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE
 		);
-		m_depthBuffer.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-		commandList->ResourceBarrier(1, &barrier);
-	}
-
-	// Transition shadow map to an SRV for pixel shader
-	if (m_directionalShadows.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_directionalShadows.depthBuffer.Get(),
-			m_directionalShadows.state,
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-		);
-		m_directionalShadows.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		m_depthBuffer.state = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
 		commandList->ResourceBarrier(1, &barrier);
 	}
 
@@ -208,35 +197,24 @@ void Renderer::RenderCSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> co
 	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer)
 {
 	// Transition the scene color SRV for compute
-	if (m_sceneColorState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+	if (m_sceneColorState != D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE) {
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			m_sceneColor.Get(),
 			m_sceneColorState,
-			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+			D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE
 		);
-		m_sceneColorState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		m_sceneColorState = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
 		commandList->ResourceBarrier(1, &barrier);
 	}
 
 	// Transition the depth buffer to an SRV for compute
-	if (m_depthBuffer.state != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+	if (m_depthBuffer.state != D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE) {
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			m_depthBuffer.depthBuffer.Get(),
 			m_depthBuffer.state,
-			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+			D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE
 		);
-		m_depthBuffer.state = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-		commandList->ResourceBarrier(1, &barrier);
-	}
-
-	// Transition the shadow map for compute shader
-	if (m_directionalShadows.state != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_directionalShadows.depthBuffer.Get(),
-			m_directionalShadows.state,
-			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
-		);
-		m_directionalShadows.state = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		m_depthBuffer.state = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
 		commandList->ResourceBarrier(1, &barrier);
 	}
 
@@ -1160,10 +1138,12 @@ void Renderer::RenderShadowMaps(const Scene &scene, Microsoft::WRL::ComPtr<ID3D1
 	// Transition depth buffer to RTV
 	{
 		if (m_directionalShadows.state != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
-			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_directionalShadows.depthBuffer.Get(),
-				m_directionalShadows.state, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+				m_directionalShadows.depthBuffer.Get(),
+				m_directionalShadows.state,
+				D3D12_RESOURCE_STATE_DEPTH_WRITE
+			);
 			m_directionalShadows.state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-
 			commandList->ResourceBarrier(1, &barrier);
 		}
 	}
@@ -1199,13 +1179,15 @@ void Renderer::RenderShadowMaps(const Scene &scene, Microsoft::WRL::ComPtr<ID3D1
 		commandList->DrawIndexedInstanced(_countof(Cube::indices), 1, 0, 0, 0);
 	}
 
-	// Transition depth buffer to SRV
+	// Transition depth buffer to SRV for both PS and CS
 	{
-		if (m_directionalShadows.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_directionalShadows.depthBuffer.Get(),
-				D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			m_directionalShadows.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-
+		if (m_directionalShadows.state != D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE) {
+			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+				m_directionalShadows.depthBuffer.Get(),
+				m_directionalShadows.state,
+				D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE
+			);
+			m_directionalShadows.state = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
 			commandList->ResourceBarrier(1, &barrier);
 		}
 	}

@@ -60,6 +60,9 @@ private:
 	uint64_t							m_frameFenceValues[m_numFrames] = {};
 	HANDLE								m_fenceEvent;
 
+	// User settings
+	bool m_useComputeshaderFog = false;
+
 	// Present settings
 	bool m_vSync = true;
 	bool m_tearingSupported = false;
@@ -92,7 +95,6 @@ private:
 	// Compute shader specific
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_computeRootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_computePipelineState;
-	bool m_useComputeshaderFog = false;
 
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;

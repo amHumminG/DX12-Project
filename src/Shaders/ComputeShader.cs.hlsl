@@ -19,7 +19,8 @@ Texture2D<float> DepthBuffer : register(t1);
 
 struct DirectionalLight
 {
-    matrix vpMatrix;
+    matrix view;
+    matrix proj;
     float3 color;
     float dirPad1;
     float3 direction;
@@ -94,16 +95,16 @@ void main( uint3 DTid : SV_DispatchThreadID )
     float depth = DepthBuffer.Load(int3(pixelCoords, 0));
 
     float3 worldPos = ComputeWorldSpacePosition(uv, depth, inverseVP);
-    float3 viewDir = worldPos - camPos; // Is this correct? (Previously: float3 viewDir = worldPos;)
+    float3 viewDir = worldPos - camPos;
     float viewLength = length(viewDir);
     float3 rayDir = normalize(viewDir);
 
     // Volumetric fog settings
     float density = 0.04f;
-    float stepSize = 2.0f;
-    float maxDistance = raySteps * stepSize;
+    float maxDistance = 64.0f;
+    float stepSize = maxDistance / max(float(raySteps), 1.0f);
     float noiseOffset = 2.0f;
-    float3 fogColor = float3(0.2f, 0.02f, 0.2f);
+    float3 fogColor = float3(0.01f, 0.01f, 0.2f);
     float scattering = 0.3f;
     float transmittance = 1.0f;
 
@@ -123,8 +124,7 @@ void main( uint3 DTid : SV_DispatchThreadID )
         float3 sampleWorldPos = camPos.xyz + (rayDir * distTravelled);
         float3 currentStepFog = float3(0.0f, 0.0f, 0.0f);
 
-        // Directional light
-        bool isShadowed = IsSampledPosShadowed(sampleWorldPos, dirLight.vpMatrix, DirLightShadowMap, 0);
+        bool isShadowed = IsSampledPosShadowed(sampleWorldPos, mul(dirLight.view, dirLight.proj), DirLightShadowMap, 0);
         if (density > 0.0f && !isShadowed) currentStepFog += dirLight.color * phase;
 
         fogSum += currentStepFog * density * stepSize;
@@ -135,17 +135,3 @@ void main( uint3 DTid : SV_DispatchThreadID )
 
     ComputeOutput[pixelCoords] = float4(lerp(col.rgb, fogColor + fogSum, 1.0f - saturate(transmittance)), 1.0f);
 }
-
-
-//[numthreads(8, 8, 1)]
-//void main(uint3 dispatchThreadID : SV_DispatchThreadID) {
-//    uint2 pixelCoord = dispatchThreadID.xy;
-//
-//    uint width, height;
-//    SceneColor.GetDimensions(width, height);
-//    if (pixelCoord.x >= width || pixelCoord.y >= height) {
-//        return;
-//    }
-//
-//    ComputeOutput[pixelCoord] = SceneColor[pixelCoord];
-//}
