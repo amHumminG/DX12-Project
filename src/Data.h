@@ -44,7 +44,7 @@ struct Cube {
 struct Camera {
 	DirectX::XMFLOAT3 position;
 	float pad;
-	DirectX::XMFLOAT4X4 viewProj;
+	DirectX::XMFLOAT4X4 inverseViewProj;
 };
 
 struct RayData {

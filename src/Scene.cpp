@@ -115,7 +115,7 @@ Camera Scene::GetCameraConstBuff() const
 
 	Camera camera;
 	camera.position = m_position;
-	DirectX::XMStoreFloat4x4(&camera.viewProj, DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixMultiply(view, proj)));
+	DirectX::XMStoreFloat4x4(&camera.inverseViewProj, DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixMultiply(view, proj)));
 
 	return camera;
 }

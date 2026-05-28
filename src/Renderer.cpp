@@ -81,7 +81,9 @@ void Renderer::Render(const Scene &scene)
 	// Transition depth buffer to RTV
 	if (m_depthBuffer.state != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
 		barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_depthBuffer.depthBuffer.Get(),
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			m_depthBuffer.state,
+			D3D12_RESOURCE_STATE_DEPTH_WRITE
+		);
 		m_depthBuffer.state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
 		commandList->ResourceBarrier(1, &barrier);
@@ -117,10 +119,10 @@ void Renderer::Render(const Scene &scene)
 		commandList->DrawIndexedInstanced(_countof(Cube::indices), 1, 0, 0, 0);
 	}
 
-	if (!m_useComputeshaderFog) {
-		Camera camera = scene.GetCameraConstBuff();
-		m_cameraPS->Update(&camera, sizeof(Camera));
+	Camera camera = scene.GetCameraConstBuff();
+	m_cameraPS->Update(&camera, sizeof(Camera));
 
+	if (!m_useComputeshaderFog) {
 		RenderPSFog(commandList, backBuffer);
 	}
 	else {
@@ -140,7 +142,7 @@ void Renderer::Render(const Scene &scene)
 void Renderer::RenderPSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
 	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer)
 {
-	// Transition the scene color SRV to pixel shader resource
+	// Transition the scene color SRV for pixel shader
 	if (m_sceneColorState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			m_sceneColor.Get(),
@@ -151,14 +153,25 @@ void Renderer::RenderPSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> co
 		commandList->ResourceBarrier(1, &barrier);
 	}
 
-	// Transition the depth buffer to an SRV so the pixel shader can read it
+	// Transition the depth buffer to an SRV for pixel shader
 	if (m_depthBuffer.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			m_depthBuffer.depthBuffer.Get(),
-			D3D12_RESOURCE_STATE_DEPTH_WRITE,
+			m_depthBuffer.state,
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
 		);
 		m_depthBuffer.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		commandList->ResourceBarrier(1, &barrier);
+	}
+
+	// Transition shadow map to an SRV for pixel shader
+	if (m_directionalShadows.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			m_directionalShadows.depthBuffer.Get(),
+			m_directionalShadows.state,
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+		);
+		m_directionalShadows.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 		commandList->ResourceBarrier(1, &barrier);
 	}
 
@@ -194,25 +207,36 @@ void Renderer::RenderPSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> co
 void Renderer::RenderCSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
 	Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer)
 {
-	// Transition the scene color SRV to pixel shader resource
-	if (m_sceneColorState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+	// Transition the scene color SRV for compute
+	if (m_sceneColorState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			m_sceneColor.Get(),
 			m_sceneColorState,
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
 		);
-		m_sceneColorState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		m_sceneColorState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 		commandList->ResourceBarrier(1, &barrier);
 	}
 
-	// Transition the depth buffer to an SRV so the pixel shader can read it
-	if (m_depthBuffer.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+	// Transition the depth buffer to an SRV for compute
+	if (m_depthBuffer.state != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			m_depthBuffer.depthBuffer.Get(),
-			D3D12_RESOURCE_STATE_DEPTH_WRITE,
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+			m_depthBuffer.state,
+			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
 		);
-		m_depthBuffer.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		m_depthBuffer.state = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		commandList->ResourceBarrier(1, &barrier);
+	}
+
+	// Transition the shadow map for compute shader
+	if (m_directionalShadows.state != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			m_directionalShadows.depthBuffer.Get(),
+			m_directionalShadows.state,
+			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+		);
+		m_directionalShadows.state = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 		commandList->ResourceBarrier(1, &barrier);
 	}
 
@@ -223,7 +247,7 @@ void Renderer::RenderCSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> co
 	// Bind the UAV output texture
 	CD3DX12_GPU_DESCRIPTOR_HANDLE uavGpuHandle(
 		m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
-		12 + m_currentBackBufferIndex,
+		13 + m_currentBackBufferIndex,
 		m_resourceDescriptorSize
 	);
 	commandList->SetComputeRootDescriptorTable(0, uavGpuHandle);
@@ -231,18 +255,26 @@ void Renderer::RenderCSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> co
 	// Bind the camera data CBV
 	CD3DX12_GPU_DESCRIPTOR_HANDLE cameraCbvHandle(
 		m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
-		2,
+		3,
 		m_resourceDescriptorSize
 	);
 	commandList->SetComputeRootDescriptorTable(1, cameraCbvHandle);
 
-	// Bind the SRV table (sceneColor and depth buffer)
-	CD3DX12_GPU_DESCRIPTOR_HANDLE srvTableHandle(
+	// Bind rayData
+	CD3DX12_GPU_DESCRIPTOR_HANDLE rayDataHandle(
 		m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
 		4,
 		m_resourceDescriptorSize
 	);
-	commandList->SetComputeRootDescriptorTable(2, srvTableHandle);
+	commandList->SetComputeRootDescriptorTable(2, rayDataHandle);
+
+	// Bind the SRV table (sceneColor and depth buffer)
+	CD3DX12_GPU_DESCRIPTOR_HANDLE srvTableHandle(
+		m_resourceDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
+		5,
+		m_resourceDescriptorSize
+	);
+	commandList->SetComputeRootDescriptorTable(3, srvTableHandle);
 
 	// Dispatch compute shader
 	commandList->Dispatch(
@@ -463,7 +495,7 @@ void Renderer::UpdateRenderTargetViews() {
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 	CD3DX12_CPU_DESCRIPTOR_HANDLE uavHandle(m_resourceDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-	uavHandle.Offset(12, m_resourceDescriptorSize);
+	uavHandle.Offset(13, m_resourceDescriptorSize);
 
 	for (int i = 0; i < m_numFrames; i++) {
 		Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer;
@@ -512,26 +544,39 @@ bool Renderer::InitializeComputeRootSignature() {
 	uavRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
 
 	// Camera/light data cbv (b0)
-	CD3DX12_DESCRIPTOR_RANGE cbvRange;
-	cbvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	CD3DX12_DESCRIPTOR_RANGE camRange;
+	camRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+
+	// Ray data (b1)
+	CD3DX12_DESCRIPTOR_RANGE rayDataRange;
+	rayDataRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
 
 	// Texture data srv (t0 -> t7)
 	CD3DX12_DESCRIPTOR_RANGE srvRange;
 	srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8, 0);
 
 	// Create root parameters
-	CD3DX12_ROOT_PARAMETER computeRootParameters[3];
+	CD3DX12_ROOT_PARAMETER computeRootParameters[4];
 	computeRootParameters[0].InitAsDescriptorTable(1, &uavRange);
-	computeRootParameters[1].InitAsDescriptorTable(1, &cbvRange);
-	computeRootParameters[2].InitAsDescriptorTable(1, &srvRange);
+	computeRootParameters[1].InitAsDescriptorTable(1, &camRange);
+	computeRootParameters[2].InitAsDescriptorTable(1, &rayDataRange);
+	computeRootParameters[3].InitAsDescriptorTable(1, &srvRange);
+
+	CD3DX12_STATIC_SAMPLER_DESC staticSampler = {};
+	staticSampler.ShaderRegister = 0; // (s0)
+	staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+	staticSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	staticSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	staticSampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	staticSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 	// Root signature description
 	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC computeRootSignatureDesc;
 	computeRootSignatureDesc.Init_1_0(
 		_countof(computeRootParameters),
 		computeRootParameters,
-		0,
-		nullptr,
+		1,
+		&staticSampler,
 		D3D12_ROOT_SIGNATURE_FLAG_NONE
 	);
 
@@ -753,7 +798,7 @@ void Renderer::CreateRootSignature()
 		float fov = 45.0f;
 		float aspectRatio = 1280 / static_cast<float>(720);
 		DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fov), aspectRatio, 0.1f, 100.0f);
-		DirectX::XMStoreFloat4x4(&camera.viewProj, DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixMultiply(view, projection)));
+		DirectX::XMStoreFloat4x4(&camera.inverseViewProj, DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixMultiply(view, projection)));
 		m_cameraPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 3, &camera, sizeof(Camera));
 
 		ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
@@ -761,8 +806,7 @@ void Renderer::CreateRootSignature()
 
 		// b1
 		RayData rayData;
-		rayData.totalSpotLights = 0;
-		rayData.raySteps = 0;
+		rayData.raySteps = 32;
 		rayData.frameCount = 1;
 		m_rayDataPS = std::make_unique<ConstantBuffer>(m_device, m_resourceDescriptorHeap, 4, &rayData, sizeof(RayData));
 
@@ -1099,7 +1143,7 @@ void Renderer::CreateStructuredBuffer(void *data, UINT64 bufferSize, Microsoft::
 	CD3DX12_RESOURCE_BARRIER barrierCopyEnd = CD3DX12_RESOURCE_BARRIER::Transition(
 		buffer.Get(),
 		D3D12_RESOURCE_STATE_COPY_DEST,
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+		D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE
 	);
 	commandList->ResourceBarrier(1, &barrierCopyEnd);
 
@@ -1117,7 +1161,7 @@ void Renderer::RenderShadowMaps(const Scene &scene, Microsoft::WRL::ComPtr<ID3D1
 	{
 		if (m_directionalShadows.state != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
 			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_directionalShadows.depthBuffer.Get(),
-				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+				m_directionalShadows.state, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 			m_directionalShadows.state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
 			commandList->ResourceBarrier(1, &barrier);

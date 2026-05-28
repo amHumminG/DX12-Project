@@ -17,10 +17,9 @@ cbuffer camera : register(b0)
 
 cbuffer RayData : register(b1)
 {
-    uint totalSpotLights;
-    uint totalPointLights;
+    uint raySteps;
     uint frameCount;
-    float pad;
+    float2 rayPad;
 }
 
 struct SpotLightBuffer
@@ -194,57 +193,6 @@ float4 main(PixelShaderInput IN) : SV_Target
             float3 toLight =  normalize(-directionalLight[0].direction);
             float RdotL = dot(rayDir, toLight);
             fogSum += directionalLight[0].colour * PhaseHG(RdotL, scattering);
-        }
-        
-        // Spot lights
-        for (int i = 0; i < totalSpotLights; i++)
-        {
-            float3 toLight = spotLights[i].position - sampleWorldPos;
-            if (dot(toLight, toLight) > spotLights[i].range * spotLights[i].range)
-            {
-                continue;
-            }
-            
-            isShadowed = IsSampledPosShadowed(sampleWorldPos, spotLights[i].vpMatrix, spotShadowMaps, i);
-            if (density > 0.0f && !isShadowed)
-            {
-                float3 toLight = normalize(spotLights[i].position - worldPos);
-                float RdotL = CalculateRdotL(rayDir, toLight);
-                float attenuation = abs(CalculateAttenuation(spotLights[i], sampleWorldPos));
-                fogSum += spotLights[i].colour * attenuation * PhaseHG(RdotL, scattering);
-            }
-        }
-        
-        // Point lights
-        for (int i = 0; i < totalPointLights; i++)
-        {
-            float3 toLight = pointLights[i].position - sampleWorldPos;
-            if (dot(toLight, toLight) > pointLights[i].range * pointLights[i].range)
-            {
-                continue;
-            }
-            
-            float3 sampleDir = normalize(sampleWorldPos - pointLights[i].position);
-
-            // Determine cubemap face
-            int face = 0;
-            float3 absDir = abs(sampleDir);
-
-            if (absDir.x > absDir.y && absDir.x > absDir.z)
-                face = sampleDir.x > 0 ? 0 : 1;
-            else if (absDir.y > absDir.z)
-                face = sampleDir.y > 0 ? 2 : 3;
-            else
-                face = sampleDir.z > 0 ? 4 : 5;
-            
-            isShadowed = IsSampledPosShadowed(sampleWorldPos, pointLights[i].vpMatrix[face], sampleDir, pointShadowMaps, i);
-            if (density > 0.0f && !isShadowed)
-            {
-                float3 toLight = normalize(pointLights[i].position - worldPos);
-                float RdotL = CalculateRdotL(rayDir, toLight);
-                float attenuation = abs(CalculateAttenuation(pointLights[i], sampleWorldPos));
-                fogSum += pointLights[i].colour * attenuation * PhaseHG(RdotL, scattering);
-            }
         }
 
         fogColor.rgb += fogSum * density * stepSize;
