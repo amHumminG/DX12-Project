@@ -101,7 +101,7 @@ float4 main(PixelShaderInput IN) : SV_Target
     float density = 0.04f;
     float maxDistance = 64.0f;
     float stepSize = maxDistance / max(float(raySteps), 1.0f);
-    float noiseOffset = 2.0f;
+    float noiseOffset = stepSize;
     float3 fogColor = float3(0.2f, 0.01f, 0.01f);
     float scattering = 0.3f;
     float transmittance = 1.0f;
