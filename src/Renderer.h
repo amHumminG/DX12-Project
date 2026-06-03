@@ -29,6 +29,7 @@ public:
 	void RenderCSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
 		Microsoft::WRL::ComPtr<ID3D12Resource> backBuffer);
 
+	void ToggleFog();
 	void ToggleComputeShaderFog();
 
 	ConstantBuffer *GetConstantBuffer();
@@ -61,6 +62,7 @@ private:
 	HANDLE								m_fenceEvent;
 
 	// User settings
+	bool m_useFog = true;
 	bool m_useComputeshaderFog = false;
 
 	// Present settings

@@ -122,11 +122,41 @@ void Renderer::Render(const Scene &scene)
 	Camera camera = scene.GetCameraConstBuff();
 	m_cameraPS->Update(&camera, sizeof(Camera));
 
-	if (!m_useComputeshaderFog) {
-		RenderPSFog(commandList, backBuffer);
+	if (m_useFog) {
+		if (!m_useComputeshaderFog) {
+			RenderPSFog(commandList, backBuffer);
+		}
+		else {
+			RenderCSFog(commandList, backBuffer);
+		}
 	}
 	else {
-		RenderCSFog(commandList, backBuffer);
+		if (m_sceneColorState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
+			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			   m_sceneColor.Get(),
+			   m_sceneColorState,
+			   D3D12_RESOURCE_STATE_COPY_SOURCE
+			);
+			m_sceneColorState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+			commandList->ResourceBarrier(1, &barrier);
+		}
+
+		CD3DX12_RESOURCE_BARRIER copyDestBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		   backBuffer.Get(),
+		   D3D12_RESOURCE_STATE_RENDER_TARGET,
+		   D3D12_RESOURCE_STATE_COPY_DEST
+		);
+		commandList->ResourceBarrier(1, &copyDestBarrier);
+
+		// Copy texture to back buffer
+		commandList->CopyResource(backBuffer.Get(), m_sceneColor.Get());
+
+		CD3DX12_RESOURCE_BARRIER presentBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		   backBuffer.Get(),
+		   D3D12_RESOURCE_STATE_COPY_DEST,
+		   D3D12_RESOURCE_STATE_PRESENT
+		);
+		commandList->ResourceBarrier(1, &presentBarrier);
 	}
 
 	m_commandQueue->ExecuteCommandList(commandList);
@@ -291,6 +321,10 @@ void Renderer::RenderCSFog(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> co
 		D3D12_RESOURCE_STATE_PRESENT
 	);
 	commandList->ResourceBarrier(2, restoreBarriers);
+}
+
+void Renderer::ToggleFog() {
+	m_useFog = !m_useFog;
 }
 
 void Renderer::ToggleComputeShaderFog() {
