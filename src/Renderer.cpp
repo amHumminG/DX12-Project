@@ -563,9 +563,9 @@ bool Renderer::InitializeComputeRootSignature() {
 	CD3DX12_DESCRIPTOR_RANGE rayDataRange;
 	rayDataRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
 
-	// Texture data srv (t0 -> t7)
+	// Texture data srv (t0 -> t3)
 	CD3DX12_DESCRIPTOR_RANGE srvRange;
-	srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8, 0);
+	srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0);
 
 	// Create root parameters
 	CD3DX12_ROOT_PARAMETER computeRootParameters[4];
@@ -825,9 +825,9 @@ void Renderer::CreateRootSignature()
 		ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
 		rootParameters[3].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_PIXEL);
 
-		// t0 - t7
+		// t0 - t3
 		{
-			ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8, 0);
+			ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0);
 			rootParameters[4].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_PIXEL);
 
 			// Texture2D
@@ -869,35 +869,13 @@ void Renderer::CreateRootSignature()
 			srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
 			m_device->CreateShaderResourceView(m_depthBuffer.depthBuffer.Get(), &srvDesc, hDescriptor);
 
-			// t2 Spotlights
-			hDescriptor.Offset(1, m_resourceDescriptorSize);
-			m_device->CreateShaderResourceView(nullptr, &sbViewDesc, hDescriptor);
-
-			// t3 Spotlights shadow maps
-			hDescriptor.Offset(1, m_resourceDescriptorSize);
-			m_device->CreateShaderResourceView(nullptr, &arrayViewDesc, hDescriptor);
-
-			// t4 Directional light
+			// t2 Directional light
 			hDescriptor.Offset(1, m_resourceDescriptorSize);
 			m_device->CreateShaderResourceView(m_directionalLight.Get(), &sbViewDesc, hDescriptor);
 
-			// t5 Directional shadow map
+			// t3 Directional shadow map
 			hDescriptor.Offset(1, m_resourceDescriptorSize);
 			m_device->CreateShaderResourceView(m_directionalShadows.depthBuffer.Get(), &arrayViewDesc, hDescriptor);
-
-			// t6 Point lights
-			hDescriptor.Offset(1, m_resourceDescriptorSize);
-			m_device->CreateShaderResourceView(nullptr, &sbViewDesc, hDescriptor);
-
-			// t7 Point lights shadow maps
-			arrayViewDesc = {};
-			arrayViewDesc.Format = DXGI_FORMAT_R32_FLOAT;
-			arrayViewDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
-			arrayViewDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			arrayViewDesc.TextureCubeArray.MostDetailedMip = 0;
-			arrayViewDesc.TextureCubeArray.MipLevels = 1;
-			hDescriptor.Offset(1, m_resourceDescriptorSize);
-			m_device->CreateShaderResourceView(nullptr, &arrayViewDesc, hDescriptor);
 		}
 
 		// s0

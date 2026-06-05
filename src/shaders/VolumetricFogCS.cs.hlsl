@@ -27,8 +27,8 @@ struct DirectionalLight
     float dirPad2;
 };
 
-StructuredBuffer<DirectionalLight> DirLight : register(t4);
-Texture2DArray<float> DirLightShadowMap : register(t5);
+StructuredBuffer<DirectionalLight> DirLight : register(t2);
+Texture2DArray<float> DirLightShadowMap : register(t3);
 
 SamplerState ShadowSampler : register(s0);
 
