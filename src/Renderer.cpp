@@ -697,7 +697,7 @@ bool Renderer::LoadContent(const Scene &scene)
 
 	// --- Compute Shader Setup ---
 	Microsoft::WRL::ComPtr<ID3DBlob> computeShaderBlob;
-	ThrowIfFailed(D3DReadFileToBlob(L"ComputeShader.cso", &computeShaderBlob));
+	ThrowIfFailed(D3DReadFileToBlob(L"VolumetricFogCS.cso", &computeShaderBlob));
 
 	D3D12_COMPUTE_PIPELINE_STATE_DESC computePipelineStateDesc = {};
 	computePipelineStateDesc.pRootSignature = m_computeRootSignature.Get();
