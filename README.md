@@ -1,7 +1,8 @@
-# DV2551 DirectX 12 Rendering Project
+# DirectX 12 Rendering Project
 This repository contains a custom DirectX 12 rendering engine developed for a university course (DV2551 - 3D Programming III).
 The project implements screen-space raymarched volumetric fog using both a traditional Pixel Shader approach and a Compute
 Shader approach in order to compare performance between the two.
+
 ## Prerequisites
 * Windows 10/11
 * CMake
